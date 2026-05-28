@@ -20,7 +20,8 @@ greatly appreciated.
 Contribution Guidelines
 -----------------------
 Please read the `devguide <https://devguide.python.org/>`_ for
-guidance on how to contribute to this project. The documentation covers
+guidance on how to contribute to this project. If you use AI tools in
+your contributions, please review our `AI Policy <AI_POLICY.MD>`_. The documentation covers
 everything from how to build the code to submitting a pull request. There are
 also suggestions on how you can most effectively help the project.
 
