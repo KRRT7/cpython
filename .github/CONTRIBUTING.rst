@@ -223,6 +223,9 @@ Trivial changes (typo fixes, etc.) do not need an issue number.
 ``[X.Y]`` is the branch name (e.g. ``[3.13]``); ``GH-NNNNNN`` is the original
 PR number from ``main``.
 
+Use the backport template by appending ``?template=backport.md`` when opening
+the PR on GitHub.
+
 **News entry path**
 
 .. code-block:: text
