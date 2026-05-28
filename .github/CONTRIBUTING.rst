@@ -45,11 +45,3 @@ If no core developer has done a review or responded to changes made because of a
 "changes requested" review within a month, you can ask for someone to
 review your pull request via a post in the `Core Development Discourse
 category <https://discuss.python.org/c/core-dev/23>`__.
-
-
-Code of Conduct
----------------
-All interactions for this project are covered by the
-`PSF Code of Conduct <https://www.python.org/psf/codeofconduct/>`_. Everyone is
-expected to be open, considerate, and respectful of others no matter their
-position within the project.
