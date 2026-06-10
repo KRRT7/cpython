@@ -3878,7 +3878,6 @@ long_add_method(PyObject *a, PyObject *b)
     return (PyObject*)long_add((PyLongObject*)a, (PyLongObject*)b);
 }
 
-
 static PyLongObject *
 long_sub(PyLongObject *a, PyLongObject *b)
 {
@@ -3915,7 +3914,6 @@ _PyCompactLong_Subtract(PyLongObject *a, PyLongObject *b)
     stwodigits v = medium_value(a) - medium_value(b);
     return medium_from_stwodigits(v);
 }
-
 static PyObject *
 long_sub_method(PyObject *a, PyObject *b)
 {
