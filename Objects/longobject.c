@@ -3880,20 +3880,6 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
 }
 
 static inline bool
-i64_add_overflow(int64_t a, int64_t b, int64_t *out)
-{
-#if defined(__GNUC__) || defined(__clang__)
-    return __builtin_add_overflow(a, b, out);
-#else
-    if ((b > 0 && a > INT64_MAX - b) || (b < 0 && a < INT64_MIN - b)) {
-        return true;
-    }
-    *out = a + b;
-    return false;
-#endif
-}
-
-static inline bool
 i64_sub_overflow(int64_t a, int64_t b, int64_t *out)
 {
 #if defined(__GNUC__) || defined(__clang__)
@@ -3987,7 +3973,9 @@ _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
         return PyStackRef_NULL;
     }
     if (LIKELY(_PyLong_SameSign(a, b))) {
-        if (i64_add_overflow(left, right, &res)) {
+        uint64_t ures = (uint64_t)left + (uint64_t)right;
+        res = (int64_t)ures;
+        if ((res ^ left) < 0) {
             PyLongObject *result = long_add(a, b);
             if (result == NULL) {
                 return PyStackRef_ERROR;
