@@ -3954,18 +3954,19 @@ _PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
         default:
             return 0;
     }
-    if (_PyLong_IsNegative(v)) {
+    if (!_PyLong_IsNegative(v)) {
         if (value <= (uint64_t)INT64_MAX) {
-            *out = -(int64_t)value;
+            *out = (int64_t)value;
             return 1;
         }
-        if (value == (uint64_t)INT64_MAX + 1) {
-            *out = INT64_MIN;
-            return 1;
-        }
+        return 0;
     }
-    else if (value <= (uint64_t)INT64_MAX) {
-        *out = (int64_t)value;
+    if (value <= (uint64_t)INT64_MAX) {
+        *out = -(int64_t)value;
+        return 1;
+    }
+    if (value == (uint64_t)INT64_MAX + 1) {
+        *out = INT64_MIN;
         return 1;
     }
     return 0;
