@@ -3958,7 +3958,7 @@ _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
         !_PyLong_ExactToInt64(b, &right)) {
         return PyStackRef_NULL;
     }
-    if (LIKELY(_PyLong_SameSign(a, b))) {
+    if (LIKELY((left ^ right) >= 0)) {
         uint64_t ures = (uint64_t)left + (uint64_t)right;
         res = (int64_t)ures;
         if ((res ^ left) < 0) {
@@ -4028,7 +4028,7 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
         !_PyLong_ExactToInt64(b, &right)) {
         return PyStackRef_NULL;
     }
-    if (LIKELY(_PyLong_SameSign(a, b))) {
+    if (LIKELY((left ^ right) >= 0)) {
         res = left - right;
     }
     else {
