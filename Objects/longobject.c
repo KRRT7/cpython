@@ -3930,17 +3930,43 @@ _PyLong_ExactToInt64(PyObject *op, int64_t *out)
         return 1;
     }
     Py_ssize_t ndigits = _PyLong_DigitCount(v);
-    uint64_t value = 0;
-    for (Py_ssize_t i = ndigits; --i >= 0;) {
-        value = (value << PyLong_SHIFT) | v->long_value.ob_digit[i];
+    uint64_t value;
+    digit *digits = v->long_value.ob_digit;
+    switch (ndigits) {
+#if PYLONG_BITS_IN_DIGIT == 15
+        case 5:
+            value = digits[4];
+            value = (value << PyLong_SHIFT) | digits[3];
+            value = (value << PyLong_SHIFT) | digits[2];
+            value = (value << PyLong_SHIFT) | digits[1];
+            value = (value << PyLong_SHIFT) | digits[0];
+            break;
+        case 4:
+            value = digits[3];
+            value = (value << PyLong_SHIFT) | digits[2];
+            value = (value << PyLong_SHIFT) | digits[1];
+            value = (value << PyLong_SHIFT) | digits[0];
+            break;
+        case 3:
+            value = digits[2];
+            value = (value << PyLong_SHIFT) | digits[1];
+            value = (value << PyLong_SHIFT) | digits[0];
+            break;
+#endif
+        case 2:
+            value = digits[1];
+            value = (value << PyLong_SHIFT) | digits[0];
+            break;
+        default:
+            return 0;
     }
     if (_PyLong_IsNegative(v)) {
-        if (value == (uint64_t)INT64_MAX + 1) {
-            *out = INT64_MIN;
-            return 1;
-        }
         if (value <= (uint64_t)INT64_MAX) {
             *out = -(int64_t)value;
+            return 1;
+        }
+        if (value == (uint64_t)INT64_MAX + 1) {
+            *out = INT64_MIN;
             return 1;
         }
     }
