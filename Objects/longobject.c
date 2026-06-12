@@ -3879,20 +3879,6 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
     return medium_from_stwodigits(v);
 }
 
-static inline bool
-i64_sub_overflow(int64_t a, int64_t b, int64_t *out)
-{
-#if defined(__GNUC__) || defined(__clang__)
-    return __builtin_sub_overflow(a, b, out);
-#else
-    if ((b < 0 && a > INT64_MAX + b) || (b > 0 && a < INT64_MIN + b)) {
-        return true;
-    }
-    *out = a - b;
-    return false;
-#endif
-}
-
 static inline _PyStackRef
 wide_int_result(int64_t v)
 {
@@ -4045,12 +4031,16 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
     if (LIKELY(_PyLong_SameSign(a, b))) {
         res = left - right;
     }
-    else if (i64_sub_overflow(left, right, &res)) {
-        PyLongObject *result = long_sub(a, b);
-        if (result == NULL) {
-            return PyStackRef_ERROR;
+    else {
+        uint64_t ures = (uint64_t)left - (uint64_t)right;
+        res = (int64_t)ures;
+        if ((res ^ left) < 0) {
+            PyLongObject *result = long_sub(a, b);
+            if (result == NULL) {
+                return PyStackRef_ERROR;
+            }
+            return PyStackRef_FromPyObjectSteal((PyObject *)result);
         }
-        return PyStackRef_FromPyObjectSteal((PyObject *)result);
     }
     return wide_int_result(res);
 }
