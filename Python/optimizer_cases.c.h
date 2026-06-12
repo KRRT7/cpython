@@ -581,6 +581,14 @@
             break;
         }
 
+        case _GUARD_NOS_INT_WIDE: {
+            break;
+        }
+
+        case _GUARD_TOS_INT_WIDE: {
+            break;
+        }
+
         case _GUARD_NOS_OVERFLOWED: {
             break;
         }

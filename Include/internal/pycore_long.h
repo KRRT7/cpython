@@ -370,7 +370,7 @@ _PyLong_FitsInt64(const PyLongObject *op)
 }
 
 static inline int
-_PyLong_CheckExactAndFitsInt64(PyObject *op)
+_PyLong_CheckExactAndFitsInt64CheckExact(PyObject *op)
 {
     return PyLong_CheckExact(op) && _PyLong_FitsInt64((const PyLongObject *)op);
 }
