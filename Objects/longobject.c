@@ -3923,7 +3923,10 @@ exact_long_to_int64(PyObject *op, int64_t *out)
     if (!PyLong_CheckExact(op)) {
         return 0;
     }
-    if (PyLong_AsInt64(op, out) == 0) {
+    int overflow = 0;
+    long long value = PyLong_AsLongLongAndOverflow(op, &overflow);
+    if (overflow == 0) {
+        *out = (int64_t)value;
         return 1;
     }
     PyErr_Clear();
