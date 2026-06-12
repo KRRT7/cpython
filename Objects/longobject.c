@@ -3923,13 +3923,30 @@ exact_long_to_int64(PyObject *op, int64_t *out)
     if (!PyLong_CheckExact(op)) {
         return 0;
     }
-    int overflow = 0;
-    long long value = PyLong_AsLongLongAndOverflow(op, &overflow);
-    if (overflow == 0) {
+    PyLongObject *v = (PyLongObject *)op;
+    if (_PyLong_IsCompact(v)) {
+        *out = _PyLong_CompactValue(v);
+        return 1;
+    }
+    Py_ssize_t ndigits = _PyLong_DigitCount(v);
+    uint64_t value = 0;
+    for (Py_ssize_t i = ndigits; --i >= 0;) {
+        value = (value << PyLong_SHIFT) | v->long_value.ob_digit[i];
+    }
+    if (_PyLong_IsNegative(v)) {
+        if (value == (uint64_t)INT64_MAX + 1) {
+            *out = INT64_MIN;
+            return 1;
+        }
+        if (value <= (uint64_t)INT64_MAX) {
+            *out = -(int64_t)value;
+            return 1;
+        }
+    }
+    else if (value <= (uint64_t)INT64_MAX) {
         *out = (int64_t)value;
         return 1;
     }
-    PyErr_Clear();
     return 0;
 }
 
