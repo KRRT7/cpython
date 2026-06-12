@@ -25,10 +25,8 @@ class int "PyObject *" "&PyLong_Type"
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=ec0275e3422a36e3]*/
 
 #if (defined(__clang__) || (defined(__GNUC__) && (__GNUC__ > 2))) && defined(__OPTIMIZE__)
-#  define UNLIKELY(value) __builtin_expect((value), 0)
 #  define LIKELY(value) __builtin_expect((value), 1)
 #else
-#  define UNLIKELY(value) (value)
 #  define LIKELY(value) (value)
 #endif
 
@@ -3988,12 +3986,17 @@ _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
         !_PyLong_ExactToInt64(b, &right)) {
         return PyStackRef_NULL;
     }
-    if (i64_add_overflow(left, right, &res)) {
-        PyLongObject *result = long_add(a, b);
-        if (result == NULL) {
-            return PyStackRef_ERROR;
+    if (LIKELY(_PyLong_SameSign(a, b))) {
+        if (i64_add_overflow(left, right, &res)) {
+            PyLongObject *result = long_add(a, b);
+            if (result == NULL) {
+                return PyStackRef_ERROR;
+            }
+            return PyStackRef_FromPyObjectSteal((PyObject *)result);
         }
-        return PyStackRef_FromPyObjectSteal((PyObject *)result);
+    }
+    else {
+        res = left + right;
     }
     return wide_int_result(res);
 }
@@ -4051,7 +4054,10 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
         !_PyLong_ExactToInt64(b, &right)) {
         return PyStackRef_NULL;
     }
-    if (i64_sub_overflow(left, right, &res)) {
+    if (LIKELY(_PyLong_SameSign(a, b))) {
+        res = left - right;
+    }
+    else if (i64_sub_overflow(left, right, &res)) {
         PyLongObject *result = long_sub(a, b);
         if (result == NULL) {
             return PyStackRef_ERROR;
