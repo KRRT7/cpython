@@ -3941,15 +3941,15 @@ _PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
             value = (value << PyLong_SHIFT) | digits[1];
             value = (value << PyLong_SHIFT) | digits[0];
             break;
-        case 3:
-            value = digits[2];
-            value = (value << PyLong_SHIFT) | digits[1];
-            value = (value << PyLong_SHIFT) | digits[0];
-            break;
 #endif
+        case 3:
+            value = ((uint64_t)digits[2] << (PyLong_SHIFT * 2))
+                    | ((uint64_t)digits[1] << PyLong_SHIFT)
+                    | (uint64_t)digits[0];
+            break;
         case 2:
-            value = digits[1];
-            value = (value << PyLong_SHIFT) | digits[0];
+            value = ((uint64_t)digits[1] << PyLong_SHIFT)
+                    | (uint64_t)digits[0];
             break;
         default:
             return 0;
