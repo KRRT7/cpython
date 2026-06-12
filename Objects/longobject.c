@@ -3907,10 +3907,7 @@ wide_int_result(int64_t v)
     if (IS_SMALL_INT(v)) {
         return PyStackRef_FromPyObjectBorrow(get_small_int((sdigit)v));
     }
-    if (is_medium_int(v)) {
-        return medium_from_stwodigits(v);
-    }
-    PyLongObject *result = (PyLongObject *)_PyLong_FromLarge(v);
+    PyLongObject *result = _PyLong_FromSTwoDigits(v);
     if (result == NULL) {
         return PyStackRef_ERROR;
     }
