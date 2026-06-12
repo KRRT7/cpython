@@ -116,6 +116,8 @@ PyAPI_DATA(PyObject*) _PyLong_Lshift(PyObject *, int64_t);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Add(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Multiply(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Subtract(PyLongObject *left, PyLongObject *right);
+PyAPI_FUNC(_PyStackRef) _PyCompactLong_AddWide(PyLongObject *left, PyLongObject *right);
+PyAPI_FUNC(_PyStackRef) _PyCompactLong_SubtractWide(PyLongObject *left, PyLongObject *right);
 
 // Export for 'binascii' shared extension.
 PyAPI_DATA(unsigned char) _PyLong_DigitValue[256];
@@ -344,6 +346,33 @@ static inline int
 _PyLong_CheckExactAndCompact(PyObject *op)
 {
     return PyLong_CheckExact(op) && _PyLong_IsCompact((const PyLongObject *)op);
+}
+
+/* Return 1 if the exact int fits in signed int64_t. */
+static inline int
+_PyLong_FitsInt64(const PyLongObject *op)
+{
+    assert(PyLong_CheckExact((PyObject *)op));
+    Py_ssize_t ndigits = _PyLong_DigitCount(op);
+    if (ndigits <= 2) {
+        return 1;
+    }
+    if (ndigits >= 4) {
+        return 0;
+    }
+    /* Two-digit longs can still exceed int64_t on 30-bit builds, so check the
+       high digit directly. */
+    uint64_t hi = op->long_value.ob_digit[1];
+    if (_PyLong_IsNegative(op)) {
+        return hi <= ((uint64_t)INT64_MAX + 1) >> PyLong_SHIFT;
+    }
+    return hi <= (uint64_t)INT64_MAX >> PyLong_SHIFT;
+}
+
+static inline int
+_PyLong_CheckExactAndFitsInt64(PyObject *op)
+{
+    return PyLong_CheckExact(op) && _PyLong_FitsInt64((const PyLongObject *)op);
 }
 
 #ifdef __cplusplus
