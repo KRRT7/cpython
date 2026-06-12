@@ -3892,6 +3892,23 @@ wide_int_result(int64_t v)
     return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
 }
 
+static inline _PyStackRef
+wide_int_result_non_small(int64_t v)
+{
+    PyLongObject *result;
+    assert(!IS_SMALL_INT(v));
+    if (is_medium_int(v)) {
+        result = (PyLongObject *)_PyLong_FromMedium((sdigit)v);
+    }
+    else {
+        result = (PyLongObject *)_PyLong_FromLarge(v);
+    }
+    if (result == NULL) {
+        return PyStackRef_ERROR;
+    }
+    return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
+}
+
 // Decode an exact int directly into int64_t for the wide exact-int fast path.
 static inline int
 _PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
@@ -3972,7 +3989,7 @@ _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
     else {
         res = left + right;
     }
-    return wide_int_result(res);
+    return wide_int_result_non_small(res);
 }
 
 static PyObject *
@@ -4042,7 +4059,7 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
             return PyStackRef_FromPyObjectSteal((PyObject *)result);
         }
     }
-    return wide_int_result(res);
+    return wide_int_result_non_small(res);
 }
 
 static PyObject *
