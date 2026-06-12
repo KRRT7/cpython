@@ -4048,9 +4048,19 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
     if (LIKELY((left ^ right) >= 0)) {
         res = left - right;
     }
-    else {
-        uint64_t ures = (uint64_t)left - (uint64_t)right;
+    else if (right < 0) {
+        uint64_t ures = (uint64_t)left + (uint64_t)(0 - (uint64_t)right);
         res = (int64_t)ures;
+        if ((res ^ left) < 0) {
+            PyLongObject *result = long_sub(a, b);
+            if (result == NULL) {
+                return PyStackRef_ERROR;
+            }
+            return PyStackRef_FromPyObjectSteal((PyObject *)result);
+        }
+    }
+    else {
+        res = left - right;
         if ((res ^ left) < 0) {
             PyLongObject *result = long_sub(a, b);
             if (result == NULL) {

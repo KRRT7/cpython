@@ -1393,6 +1393,15 @@ class TestSpecializer(TestBase):
         binary_op_int_wide_sub()
         self.assert_specialized(binary_op_int_wide_sub, "BINARY_OP_SUBTRACT_INT_WIDE")
 
+        def binary_op_int_wide_sub_neg():
+            for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                a, b = 10000000000, -1
+                c = a - b
+                self.assertEqual(c, 10000000001)
+
+        binary_op_int_wide_sub_neg()
+        self.assert_specialized(binary_op_int_wide_sub_neg, "BINARY_OP_SUBTRACT_INT_WIDE")
+
         def binary_op_int_non_compact_mul():
             for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
                 a, b = 10000000000, 1
