@@ -544,7 +544,7 @@ unroll_digits_ulong(PyLongObject *v, Py_ssize_t *iptr)
 
     /* unroll 1 digit */
     --i;
-    digit *digits = v->long_value.ob_digit;
+    const digit *digits = v->long_value.ob_digit;
     unsigned long x = digits[i];
 
 #if (ULONG_MAX >> PyLong_SHIFT) >= ((1UL << PyLong_SHIFT) - 1)
@@ -568,7 +568,7 @@ unroll_digits_size_t(PyLongObject *v, Py_ssize_t *iptr)
 
     /* unroll 1 digit */
     --i;
-    digit *digits = v->long_value.ob_digit;
+    const digit *digits = v->long_value.ob_digit;
     size_t x = digits[i];
 
 #if (SIZE_MAX >> PyLong_SHIFT) >= ((1 << PyLong_SHIFT) - 1)
@@ -3916,19 +3916,16 @@ wide_int_result(int64_t v)
 
 // Decode an exact int directly into int64_t for the wide exact-int fast path.
 static inline int
-_PyLong_ExactToInt64(PyObject *op, int64_t *out)
+_PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
 {
-    if (!PyLong_CheckExact(op)) {
-        return 0;
-    }
-    PyLongObject *v = (PyLongObject *)op;
+    assert(PyLong_CheckExact((PyObject *)v));
     if (_PyLong_IsCompact(v)) {
         *out = _PyLong_CompactValue(v);
         return 1;
     }
     Py_ssize_t ndigits = _PyLong_DigitCount(v);
     uint64_t value;
-    digit *digits = v->long_value.ob_digit;
+    const digit *digits = v->long_value.ob_digit;
     switch (ndigits) {
 #if PYLONG_BITS_IN_DIGIT == 15
         case 5:
@@ -3978,8 +3975,8 @@ _PyStackRef
 _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
 {
     int64_t left, right, res;
-    if (!_PyLong_ExactToInt64((PyObject *)a, &left) ||
-        !_PyLong_ExactToInt64((PyObject *)b, &right)) {
+    if (!_PyLong_ExactToInt64(a, &left) ||
+        !_PyLong_ExactToInt64(b, &right)) {
         return PyStackRef_NULL;
     }
     if (i64_add_overflow(left, right, &res)) {
@@ -4041,8 +4038,8 @@ _PyStackRef
 _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
 {
     int64_t left, right, res;
-    if (!_PyLong_ExactToInt64((PyObject *)a, &left) ||
-        !_PyLong_ExactToInt64((PyObject *)b, &right)) {
+    if (!_PyLong_ExactToInt64(a, &left) ||
+        !_PyLong_ExactToInt64(b, &right)) {
         return PyStackRef_NULL;
     }
     if (i64_sub_overflow(left, right, &res)) {
