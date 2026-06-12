@@ -3880,29 +3880,10 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
 }
 
 static inline _PyStackRef
-wide_int_result(int64_t v)
-{
-    if (IS_SMALL_INT(v)) {
-        return PyStackRef_FromPyObjectBorrow(get_small_int((sdigit)v));
-    }
-    PyLongObject *result = _PyLong_FromSTwoDigits(v);
-    if (result == NULL) {
-        return PyStackRef_ERROR;
-    }
-    return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
-}
-
-static inline _PyStackRef
-wide_int_result_non_small(int64_t v)
+wide_int_result_stwodigits(int64_t v)
 {
     PyLongObject *result;
-    assert(!IS_SMALL_INT(v));
-    if (is_medium_int(v)) {
-        result = (PyLongObject *)_PyLong_FromMedium((sdigit)v);
-    }
-    else {
-        result = (PyLongObject *)_PyLong_FromLarge(v);
-    }
+    result = _PyLong_FromSTwoDigits(v);
     if (result == NULL) {
         return PyStackRef_ERROR;
     }
@@ -3989,7 +3970,7 @@ _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
     else {
         res = left + right;
     }
-    return wide_int_result_non_small(res);
+    return wide_int_result_stwodigits(res);
 }
 
 static PyObject *
@@ -4069,7 +4050,7 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
             return PyStackRef_FromPyObjectSteal((PyObject *)result);
         }
     }
-    return wide_int_result_non_small(res);
+    return wide_int_result_stwodigits(res);
 }
 
 static PyObject *
