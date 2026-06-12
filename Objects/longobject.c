@@ -37,6 +37,8 @@ class int "PyObject *" "&PyLong_Type"
 
 // Forward declarations
 static PyLongObject* long_neg(PyLongObject *v);
+static PyLongObject *long_add(PyLongObject *a, PyLongObject *b);
+static PyLongObject *long_sub(PyLongObject *a, PyLongObject *b);
 static PyLongObject *x_divrem(PyLongObject *, PyLongObject *, PyLongObject **);
 static PyObject* long_long(PyObject *v);
 static PyObject* long_lshift_int64(PyLongObject *a, int64_t shiftby);
@@ -3918,10 +3920,14 @@ wide_int_result(int64_t v)
 static inline int
 exact_long_to_int64(PyObject *op, int64_t *out)
 {
-    if (!PyLong_CheckExact(op) || !_PyLong_FitsInt64((PyLongObject *)op)) {
+    if (!PyLong_CheckExact(op)) {
         return 0;
     }
-    return PyLong_AsInt64(op, out) == 0;
+    if (PyLong_AsInt64(op, out) == 0) {
+        return 1;
+    }
+    PyErr_Clear();
+    return 0;
 }
 
 _PyStackRef
@@ -3933,7 +3939,11 @@ _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
         return PyStackRef_NULL;
     }
     if (i64_add_overflow(left, right, &res)) {
-        return PyStackRef_NULL;
+        PyLongObject *result = long_add(a, b);
+        if (result == NULL) {
+            return PyStackRef_ERROR;
+        }
+        return PyStackRef_FromPyObjectSteal((PyObject *)result);
     }
     return wide_int_result(res);
 }
@@ -3992,7 +4002,11 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
         return PyStackRef_NULL;
     }
     if (i64_sub_overflow(left, right, &res)) {
-        return PyStackRef_NULL;
+        PyLongObject *result = long_sub(a, b);
+        if (result == NULL) {
+            return PyStackRef_ERROR;
+        }
+        return PyStackRef_FromPyObjectSteal((PyObject *)result);
     }
     return wide_int_result(res);
 }

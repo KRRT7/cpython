@@ -354,19 +354,37 @@ _PyLong_FitsInt64(const PyLongObject *op)
 {
     assert(PyLong_CheckExact((PyObject *)op));
     Py_ssize_t ndigits = _PyLong_DigitCount(op);
-    if (ndigits <= 2) {
+    Py_ssize_t max_digits = (64 + PyLong_SHIFT - 1) / PyLong_SHIFT;
+    if (ndigits < max_digits) {
         return 1;
     }
-    if (ndigits >= 4) {
+    if (ndigits > max_digits) {
         return 0;
     }
-    /* Two-digit longs can still exceed int64_t on 30-bit builds, so check the
-       high digit directly. */
-    uint64_t hi = op->long_value.ob_digit[1];
-    if (_PyLong_IsNegative(op)) {
-        return hi <= ((uint64_t)INT64_MAX + 1) >> PyLong_SHIFT;
+    /* Longs with the maximum digit count can still exceed int64_t.  The
+       positive bound is determined by the top digit alone.  The negative
+       bound needs an exact check because only -2**63 may use the full top
+       digit; any non-zero low digits would overflow. */
+    uint64_t hi = op->long_value.ob_digit[ndigits - 1];
+    unsigned int shift = (unsigned int)((ndigits - 1) * PyLong_SHIFT);
+    uint64_t pos_limit = (uint64_t)INT64_MAX >> shift;
+    if (!_PyLong_IsNegative(op)) {
+        return hi <= pos_limit;
     }
-    return hi <= (uint64_t)INT64_MAX >> PyLong_SHIFT;
+
+    uint64_t neg_limit = ((uint64_t)INT64_MAX + 1) >> shift;
+    if (hi < neg_limit) {
+        return 1;
+    }
+    if (hi > neg_limit) {
+        return 0;
+    }
+    for (Py_ssize_t i = 0; i < ndigits - 1; i++) {
+        if (op->long_value.ob_digit[i] != 0) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 static inline int

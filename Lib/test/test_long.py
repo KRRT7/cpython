@@ -1154,6 +1154,13 @@ class LongTest(unittest.TestCase):
         self.assertEqual(beyond_max + 1, int64_max + 3)
         self.assertEqual(beyond_min + (-1), int64_min - 3)
 
+    def test_int64_boundary_add_loop(self):
+        int64_max = (1 << 63) - 1
+        x = int64_max - 1
+        for _ in range(5):
+            x = x + 1
+        self.assertEqual(x, int64_max + 4)
+
     def test_int64_boundary_sub(self):
         int64_max = (1 << 63) - 1
         int64_min = -(1 << 63)
@@ -1167,6 +1174,13 @@ class LongTest(unittest.TestCase):
         beyond_min = int64_min - 2
         self.assertEqual(beyond_max - 1, int64_max + 1)
         self.assertEqual(beyond_min - (-1), int64_min - 1)
+
+    def test_int64_boundary_sub_loop(self):
+        int64_min = -(1 << 63)
+        x = int64_min + 1
+        for _ in range(5):
+            x = x - 1
+        self.assertEqual(x, int64_min - 4)
 
     def test_bit_length(self):
         tiny = 1e-10
