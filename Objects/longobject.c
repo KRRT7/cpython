@@ -24,6 +24,14 @@ class int "PyObject *" "&PyLong_Type"
 [clinic start generated code]*/
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=ec0275e3422a36e3]*/
 
+#if (defined(__clang__) || (defined(__GNUC__) && (__GNUC__ > 2))) && defined(__OPTIMIZE__)
+#  define UNLIKELY(value) __builtin_expect((value), 0)
+#  define LIKELY(value) __builtin_expect((value), 1)
+#else
+#  define UNLIKELY(value) (value)
+#  define LIKELY(value) (value)
+#endif
+
 #define medium_value(x) ((stwodigits)_PyLong_CompactValue(x))
 
 #define IS_SMALL_INT(ival) _PY_IS_SMALL_INT(ival)
@@ -3954,7 +3962,7 @@ _PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
         default:
             return 0;
     }
-    if (!_PyLong_IsNegative(v)) {
+    if (LIKELY(!_PyLong_IsNegative(v))) {
         if (value <= (uint64_t)INT64_MAX) {
             *out = (int64_t)value;
             return 1;
