@@ -21,6 +21,8 @@ CASES = (
     ("wide+small add", "a=10000000000; b=1", "a+b"),
     ("wide+wide add", "a=10000000000; b=10000000001", "a+b"),
     ("wide+wide add small", "a=10000000000; b=-9999999999", "a+b"),
+    ("wide add overflow +", "a=(1<<63)-1; b=1", "a+b"),
+    ("wide add overflow -", "a=-(1<<63); b=-1", "a+b"),
     ("small+three add", "a=1; b=1<<60", "a+b"),
     ("three+small add", "a=1<<60; b=1", "a+b"),
     ("three+three add", "a=1<<60; b=(1<<60)+1", "a+b"),
@@ -30,6 +32,8 @@ CASES = (
     ("wide+small sub", "a=10000000000; b=1", "a-b"),
     ("wide+wide sub small", "a=10000000000; b=10000000001", "a-b"),
     ("wide+wide sub-", "a=10000000000; b=-1", "a-b"),
+    ("wide sub overflow +", "a=(1<<63)-1; b=-1", "a-b"),
+    ("wide sub overflow -", "a=-(1<<63); b=1", "a-b"),
 )
 
 

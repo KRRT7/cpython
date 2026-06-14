@@ -3934,6 +3934,8 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
     return compact_addsub_result_stwodigits(v);
 }
 
+static inline _PyStackRef wide_int_result_from_uint64(uint64_t abs_v, int sign);
+
 static inline _PyStackRef
 wide_int_result_stwodigits(int64_t v)
 {
@@ -3959,18 +3961,17 @@ wide_int_result_stwodigits(int64_t v)
         result->long_value.ob_digit[0] = abs_v;
         return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
     }
-    twodigits abs_v;
-    int sign;
-    if (v < 0) {
-        abs_v = 0U - (twodigits)v;
-        sign = -1;
-    }
-    else {
-        abs_v = (twodigits)v;
-        sign = 1;
-    }
+    uint64_t abs_v = v < 0 ? 0U - (uint64_t)v : (uint64_t)v;
+    int sign = v < 0 ? -1 : 1;
+    return wide_int_result_from_uint64(abs_v, sign);
+}
+
+static inline _PyStackRef
+wide_int_result_from_uint64(uint64_t abs_v, int sign)
+{
+    assert(abs_v != 0);
     Py_ssize_t ndigits = 2;
-    twodigits t = abs_v >> (PyLong_SHIFT * 2);
+    uint64_t t = abs_v >> (PyLong_SHIFT * 2);
     while (t) {
         ++ndigits;
         t >>= PyLong_SHIFT;
@@ -3987,7 +3988,7 @@ wide_int_result_stwodigits(int64_t v)
     t = abs_v;
     digit *p = result->long_value.ob_digit;
     while (t) {
-        *p++ = Py_SAFE_DOWNCAST(t & PyLong_MASK, twodigits, digit);
+        *p++ = Py_SAFE_DOWNCAST(t & PyLong_MASK, uint64_t, digit);
         t >>= PyLong_SHIFT;
     }
     return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
@@ -4063,6 +4064,15 @@ _PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
         uint64_t ures = (uint64_t)left + (uint64_t)right;
         res = (int64_t)ures;
         if ((res ^ left) < 0) {
+            if (left >= 0) {
+                return wide_int_result_from_uint64(ures, 1);
+            }
+            uint64_t abs_left = 0U - (uint64_t)left;
+            uint64_t abs_right = 0U - (uint64_t)right;
+            uint64_t abs_v = abs_left + abs_right;
+            if (abs_v >= abs_left) {
+                return wide_int_result_from_uint64(abs_v, -1);
+            }
             PyLongObject *result = long_add(a, b);
             if (result == NULL) {
                 return PyStackRef_ERROR;
@@ -4136,22 +4146,15 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
         uint64_t ures = (uint64_t)left + (uint64_t)(0 - (uint64_t)right);
         res = (int64_t)ures;
         if ((res ^ left) < 0) {
-            PyLongObject *result = long_sub(a, b);
-            if (result == NULL) {
-                return PyStackRef_ERROR;
-            }
-            return PyStackRef_FromPyObjectSteal((PyObject *)result);
+            return wide_int_result_from_uint64(ures, 1);
         }
     }
     else {
+        uint64_t abs_v = (0U - (uint64_t)left) + (uint64_t)right;
         uint64_t ures = (uint64_t)left - (uint64_t)right;
         res = (int64_t)ures;
         if ((res ^ left) < 0) {
-            PyLongObject *result = long_sub(a, b);
-            if (result == NULL) {
-                return PyStackRef_ERROR;
-            }
-            return PyStackRef_FromPyObjectSteal((PyObject *)result);
+            return wide_int_result_from_uint64(abs_v, -1);
         }
     }
     return wide_int_result_stwodigits(res);

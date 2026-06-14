@@ -1682,6 +1682,18 @@ class TestSpecializer(TestBase):
                     "BINARY_OP_ADD_INT_WIDE",
                 ),
                 (
+                    add_wide_result,
+                    ((1 << 63) - 1, 1),
+                    1 << 63,
+                    "BINARY_OP_ADD_INT_WIDE",
+                ),
+                (
+                    add_wide_result,
+                    (-(1 << 63), -1),
+                    -(1 << 63) - 1,
+                    "BINARY_OP_ADD_INT_WIDE",
+                ),
+                (
                     subtract_wide_result,
                     (10_000_000_000, 1),
                     9_999_999_999,
