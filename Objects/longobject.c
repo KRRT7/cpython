@@ -4039,39 +4039,10 @@ _PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
     return 1;
 }
 
-_PyStackRef
-_PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
-{
-    int64_t left, right, res;
-    if (!_PyLong_ExactToInt64(a, &left) ||
-        !_PyLong_ExactToInt64(b, &right)) {
-        return PyStackRef_NULL;
-    }
-    if (LIKELY((left ^ right) >= 0)) {
-        uint64_t ures = (uint64_t)left + (uint64_t)right;
-        res = (int64_t)ures;
-        if ((res ^ left) < 0) {
-            if (left >= 0) {
-                return wide_int_result_from_uint64(ures, 1);
-            }
-            uint64_t abs_left = 0U - (uint64_t)left;
-            uint64_t abs_right = 0U - (uint64_t)right;
-            uint64_t abs_v = abs_left + abs_right;
-            if (abs_v >= abs_left) {
-                return wide_int_result_from_uint64(abs_v, -1);
-            }
-            PyLongObject *result = long_add(a, b);
-            if (result == NULL) {
-                return PyStackRef_ERROR;
-            }
-            return PyStackRef_FromPyObjectSteal((PyObject *)result);
-        }
-    }
-    else {
-        res = left + right;
-    }
-    return wide_int_result_stwodigits(res);
-}
+// The wide-int fast paths (_PyCompactLong_AddWide,
+// _PyCompactLong_SubtractWide) are defined as static inline functions
+// in pycore_long.h so the bytecode interpreter can inline them at the
+// use site.
 
 static PyObject *
 long_add_method(PyObject *a, PyObject *b)
@@ -4118,34 +4089,7 @@ _PyCompactLong_Subtract(PyLongObject *a, PyLongObject *b)
     return compact_addsub_result_stwodigits(v);
 }
 
-_PyStackRef
-_PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
-{
-    int64_t left, right, res;
-    if (!_PyLong_ExactToInt64(a, &left) ||
-        !_PyLong_ExactToInt64(b, &right)) {
-        return PyStackRef_NULL;
-    }
-    if (LIKELY((left ^ right) >= 0)) {
-        res = left - right;
-    }
-    else if (right < 0) {
-        uint64_t ures = (uint64_t)left + (uint64_t)(0 - (uint64_t)right);
-        res = (int64_t)ures;
-        if ((res ^ left) < 0) {
-            return wide_int_result_from_uint64(ures, 1);
-        }
-    }
-    else {
-        uint64_t ures = (uint64_t)left - (uint64_t)right;
-        res = (int64_t)ures;
-        if ((res ^ left) < 0) {
-            uint64_t abs_v = (0U - (uint64_t)left) + (uint64_t)right;
-            return wide_int_result_from_uint64(abs_v, -1);
-        }
-    }
-    return wide_int_result_stwodigits(res);
-}
+// (AddWide is now a static inline in pycore_long.h above this point.)
 
 static PyObject *
 long_sub_method(PyObject *a, PyObject *b)

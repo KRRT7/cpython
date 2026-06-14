@@ -9,7 +9,10 @@ extern "C" {
 #endif
 
 #include "pycore_bytesobject.h"   // _PyBytesWriter
+#include "pycore_freelist.h"     // _Py_FREELIST_POP
+#include "pycore_object.h"       // _PyObject_Init
 #include "pycore_runtime.h"       // _Py_SINGLETON()
+#include "pycore_stackref.h"     // _PyStackRef helpers
 
 /*
  * Default int base conversion size limitation: Denial of Service prevention.
@@ -116,8 +119,9 @@ PyAPI_DATA(PyObject*) _PyLong_Lshift(PyObject *, int64_t);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Add(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Multiply(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Subtract(PyLongObject *left, PyLongObject *right);
-PyAPI_FUNC(_PyStackRef) _PyCompactLong_AddWide(PyLongObject *left, PyLongObject *right);
-PyAPI_FUNC(_PyStackRef) _PyCompactLong_SubtractWide(PyLongObject *left, PyLongObject *right);
+// _PyCompactLong_AddWide and _PyCompactLong_SubtractWide are static
+// inline functions defined below; the PyAPI_FUNC wrappers in longobject.c
+// just forward to them.
 
 // Export for 'binascii' shared extension.
 PyAPI_DATA(unsigned char) _PyLong_DigitValue[256];
@@ -391,6 +395,158 @@ static inline int
 _PyLong_CheckExactAndFitsInt64CheckExact(PyObject *op)
 {
     return PyLong_CheckExact(op) && _PyLong_FitsInt64((const PyLongObject *)op);
+}
+
+// Inline definitions of the wide-int fast paths and their helpers. Defined
+// here (in the header) so generated_cases.c.h and the bytecode interpreter
+// can inline them at the use site, avoiding a function call per op. The
+// PyAPI_FUNC versions in longobject.c just forward to these.
+static inline Py_ALWAYS_INLINE int
+_PyLong_ExactToInt64_inline(const PyLongObject *v, int64_t *out)
+{
+    assert(PyLong_CheckExact((PyObject *)v));
+    if (_PyLong_IsCompact(v)) {
+        *out = _PyLong_CompactValue(v);
+        return 1;
+    }
+    Py_ssize_t ndigits = _PyLong_DigitCount(v);
+    uint64_t value;
+    const digit *digits = v->long_value.ob_digit;
+    switch (ndigits) {
+#if PYLONG_BITS_IN_DIGIT == 15
+        case 5:
+            value = digits[4];
+            value = (value << PyLong_SHIFT) | digits[3];
+            value = (value << PyLong_SHIFT) | digits[2];
+            value = (value << PyLong_SHIFT) | digits[1];
+            value = (value << PyLong_SHIFT) | digits[0];
+            break;
+        case 4:
+            value = digits[3];
+            value = (value << PyLong_SHIFT) | digits[2];
+            value = (value << PyLong_SHIFT) | digits[1];
+            value = (value << PyLong_SHIFT) | digits[0];
+            break;
+#endif
+        case 3:
+            value = ((uint64_t)digits[2] << (PyLong_SHIFT * 2))
+                    | ((uint64_t)digits[1] << PyLong_SHIFT)
+                    | (uint64_t)digits[0];
+            break;
+        case 2:
+            value = ((uint64_t)digits[1] << PyLong_SHIFT)
+                    | (uint64_t)digits[0];
+            break;
+        default:
+            return 0;
+    }
+    if (!_PyLong_IsNegative(v)) {
+        if (value > (uint64_t)INT64_MAX) {
+            return 0;
+        }
+        *out = (int64_t)value;
+        return 1;
+    }
+    // value <= INT64_MAX fits as -(value), value == INT64_MAX + 1 is INT64_MIN.
+    if (value > (uint64_t)INT64_MAX + 1) {
+        return 0;
+    }
+    *out = -(int64_t)value;
+    return 1;
+}
+
+static inline Py_ALWAYS_INLINE _PyStackRef
+wide_int_result_from_uint64_inline(uint64_t abs_v, int sign)
+{
+    assert(abs_v != 0);
+    int bit_length = 64 - __builtin_clzll(abs_v);
+    Py_ssize_t ndigits = (bit_length + PyLong_SHIFT - 1) / PyLong_SHIFT;
+    PyLongObject *result = PyObject_Malloc(
+        offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
+    if (result == NULL) {
+        PyErr_NoMemory();
+        return PyStackRef_ERROR;
+    }
+    _PyObject_Init((PyObject*)result, &PyLong_Type);
+    _PyLong_InitTag(result);
+    _PyLong_SetSignAndDigitCount(result, sign, ndigits);
+    digit *p = result->long_value.ob_digit;
+    while (abs_v) {
+        *p++ = Py_SAFE_DOWNCAST(abs_v & PyLong_MASK, uint64_t, digit);
+        abs_v >>= PyLong_SHIFT;
+    }
+    return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
+}
+
+static inline Py_ALWAYS_INLINE _PyStackRef
+wide_int_result_stwodigits_inline(int64_t v)
+{
+    if (_PY_IS_SMALL_INT(v)) {
+        return PyStackRef_FromPyObjectBorrow(
+            (PyObject *)&_PyLong_SMALL_INTS[_PY_NSMALLNEGINTS + v]);
+    }
+    return wide_int_result_from_uint64_inline(
+        v < 0 ? 0U - (uint64_t)v : (uint64_t)v, v < 0 ? -1 : 1);
+}
+
+static inline Py_ALWAYS_INLINE _PyStackRef
+_PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
+{
+    int64_t left, right, res;
+    if (!_PyLong_ExactToInt64_inline(a, &left) ||
+        !_PyLong_ExactToInt64_inline(b, &right)) {
+        return PyStackRef_NULL;
+    }
+    if ((left ^ right) >= 0) {
+        uint64_t ures = (uint64_t)left + (uint64_t)right;
+        res = (int64_t)ures;
+        if ((res ^ left) < 0) {
+            if (left >= 0) {
+                return wide_int_result_from_uint64_inline(ures, 1);
+            }
+            uint64_t abs_left = 0U - (uint64_t)left;
+            uint64_t abs_right = 0U - (uint64_t)right;
+            uint64_t abs_v = abs_left + abs_right;
+            if (abs_v >= abs_left) {
+                return wide_int_result_from_uint64_inline(abs_v, -1);
+            }
+            return PyStackRef_NULL;
+        }
+    }
+    else {
+        res = left + right;
+    }
+    return wide_int_result_stwodigits_inline(res);
+}
+
+static inline Py_ALWAYS_INLINE _PyStackRef
+_PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
+{
+    int64_t left, right;
+    if (!_PyLong_ExactToInt64_inline(a, &left) ||
+        !_PyLong_ExactToInt64_inline(b, &right)) {
+        return PyStackRef_NULL;
+    }
+    if ((left ^ right) >= 0) {
+        return wide_int_result_stwodigits_inline(left - right);
+    }
+    int64_t res;
+    if (right < 0) {
+        uint64_t ures = (uint64_t)left + (uint64_t)(0 - (uint64_t)right);
+        res = (int64_t)ures;
+        if ((res ^ left) < 0) {
+            return wide_int_result_from_uint64_inline(ures, 1);
+        }
+    }
+    else {
+        uint64_t ures = (uint64_t)left - (uint64_t)right;
+        res = (int64_t)ures;
+        if ((res ^ left) < 0) {
+            uint64_t abs_v = (0U - (uint64_t)left) + (uint64_t)right;
+            return wide_int_result_from_uint64_inline(abs_v, -1);
+        }
+    }
+    return wide_int_result_stwodigits_inline(res);
 }
 
 #ifdef __cplusplus
