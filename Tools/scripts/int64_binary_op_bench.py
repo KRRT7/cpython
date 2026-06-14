@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
-import sys
 
 
 CASES = (
@@ -21,7 +20,7 @@ CASES = (
     ("small+wide add", "a=1; b=10000000000", "a+b"),
     ("wide+small add", "a=10000000000; b=1", "a+b"),
     ("wide+wide add", "a=10000000000; b=10000000001", "a+b"),
-    ("wide+wide add-", "a=10000000000; b=-9999999999", "a+b"),
+    ("wide+wide add small", "a=10000000000; b=-9999999999", "a+b"),
     ("small+three add", "a=1; b=1<<60", "a+b"),
     ("three+small add", "a=1<<60; b=1", "a+b"),
     ("three+three add", "a=1<<60; b=(1<<60)+1", "a+b"),
@@ -29,7 +28,7 @@ CASES = (
     ("three+small sub", "a=1<<60; b=1", "a-b"),
     ("three+three sub", "a=1<<60; b=(1<<60)+1", "a-b"),
     ("wide+small sub", "a=10000000000; b=1", "a-b"),
-    ("wide+wide sub", "a=10000000000; b=10000000001", "a-b"),
+    ("wide+wide sub small", "a=10000000000; b=10000000001", "a-b"),
     ("wide+wide sub-", "a=10000000000; b=-1", "a-b"),
 )
 
@@ -84,14 +83,14 @@ def main() -> int:
     print(f"baseline:  {baseline}")
     print(f"candidate: {candidate}")
     print()
-    print(f"{'case':<18}{'baseline ns/op':>16}{'candidate ns/op':>18}{'delta':>14}{'delta %':>10}")
+    print(f"{'case':<22}{'baseline ns/op':>16}{'candidate ns/op':>18}{'delta':>14}{'delta %':>10}")
 
     for name, setup, stmt in CASES:
         base = _run_timeit(baseline, setup, stmt, args.number, args.repeat)
         cand = _run_timeit(candidate, setup, stmt, args.number, args.repeat)
         delta = cand - base
         pct = (delta / base * 100.0) if base else 0.0
-        print(f"{name:<18}{base:>16.2f}{cand:>18.2f}{delta:>14.2f}{pct:>9.2f}%")
+        print(f"{name:<22}{base:>16.2f}{cand:>18.2f}{delta:>14.2f}{pct:>9.2f}%")
 
     return 0
 

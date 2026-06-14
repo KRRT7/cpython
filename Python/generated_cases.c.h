@@ -1513,6 +1513,9 @@
                 }
                 l = left;
                 r = right;
+                if (PyStackRef_IsError(res)) {
+                    JUMP_TO_LABEL(pop_2_error);
+                }
             }
             // _POP_TOP_INT
             {

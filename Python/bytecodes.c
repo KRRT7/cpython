@@ -746,6 +746,7 @@ dummy_func(
             l = left;
             r = right;
             INPUTS_DEAD();
+            ERROR_IF(PyStackRef_IsError(res));
         }
 
         macro(BINARY_OP_MULTIPLY_INT) =

@@ -5,7 +5,8 @@ import dis
 import threading
 import types
 import unittest
-from test.support import (threading_helper, check_impl_detail,
+from test import support
+from test.support import (threading_helper, check_impl_detail, script_helper,
                           requires_specialization,
                           cpython_only, requires_jit_disabled, reset_code)
 from test.support.import_helper import import_module
@@ -1384,6 +1385,17 @@ class TestSpecializer(TestBase):
         binary_op_int_wide_add()
         self.assert_specialized(binary_op_int_wide_add, "BINARY_OP_ADD_INT_WIDE")
 
+        def binary_op_int_wide_add_small_result():
+            for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                a, b = 10000000000, -10000000000
+                c = a + b
+                self.assertIs(c, 0)
+
+        binary_op_int_wide_add_small_result()
+        self.assert_specialized(
+            binary_op_int_wide_add_small_result, "BINARY_OP_ADD_INT_WIDE"
+        )
+
         def binary_op_int_wide_sub():
             for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
                 a, b = 10000000000, 1
@@ -1401,6 +1413,17 @@ class TestSpecializer(TestBase):
 
         binary_op_int_wide_sub_neg()
         self.assert_specialized(binary_op_int_wide_sub_neg, "BINARY_OP_SUBTRACT_INT_WIDE")
+
+        def binary_op_int_wide_sub_small_result():
+            for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                a, b = 10000000000, 10000000000
+                c = a - b
+                self.assertIs(c, 0)
+
+        binary_op_int_wide_sub_small_result()
+        self.assert_specialized(
+            binary_op_int_wide_sub_small_result, "BINARY_OP_SUBTRACT_INT_WIDE"
+        )
 
         def binary_op_int_non_compact_mul():
             for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
@@ -1556,6 +1579,44 @@ class TestSpecializer(TestBase):
         binary_op_bitwise_extend()
         self.assert_specialized(binary_op_bitwise_extend, "BINARY_OP_EXTEND")
         self.assert_no_opcode(binary_op_bitwise_extend, "BINARY_OP")
+
+    @cpython_only
+    @requires_specialization
+    @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')
+    def test_binary_op_subtract_wide_overflow_no_memory(self):
+        code = """if 1:
+            import dis
+            import _testcapi
+            import _testinternalcapi
+
+            def subtract_overflow(a, b):
+                return a - b
+
+            a = (1 << 63) - 1
+            b = -1
+            for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                assert subtract_overflow(a, b) == 1 << 63
+
+            opnames = {
+                instruction.opname
+                for instruction in dis.get_instructions(
+                    subtract_overflow, adaptive=True
+                )
+            }
+            assert "BINARY_OP_SUBTRACT_INT_WIDE" in opnames, opnames
+
+            try:
+                _testcapi.set_nomemory(0, 1)
+                try:
+                    subtract_overflow(a, b)
+                except MemoryError:
+                    pass
+                else:
+                    raise AssertionError("MemoryError not raised")
+            finally:
+                _testcapi.remove_mem_hooks()
+        """
+        script_helper.assert_python_ok("-c", code)
 
     @cpython_only
     @requires_specialization

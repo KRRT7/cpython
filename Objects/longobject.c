@@ -3887,7 +3887,7 @@ wide_int_result_stwodigits(int64_t v)
     if (result == NULL) {
         return PyStackRef_ERROR;
     }
-    return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
+    return PyStackRef_FromPyObjectSteal((PyObject *)result);
 }
 
 // Decode an exact int directly into int64_t for the wide exact-int fast path.
