@@ -1609,6 +1609,31 @@ class TestSpecializer(TestBase):
         self.assert_specialized(binary_op_bitwise_extend, "BINARY_OP_EXTEND")
         self.assert_no_opcode(binary_op_bitwise_extend, "BINARY_OP")
 
+        def binary_op_bitwise_extend_signs():
+            # Exercises compact long bitwise ops with negative operands
+            # and medium-int results.
+            for _ in range(100):
+                a, b = -1, 5
+                # -1 OR anything is -1 (small int)
+                self.assertEqual(a | b, -1)
+                # -1 AND a small int returns the small int
+                self.assertEqual(a & 0xABCDEF, 0xABCDEF)
+                # XOR with -1 flips all bits
+                self.assertEqual(a ^ 0, -1)
+                self.assertEqual(a ^ 0xFF, -0x100)
+                # AND of two negative values gives a positive result
+                self.assertEqual(a & -2, -2)
+                # OR of two negative values gives -1
+                self.assertEqual(-2 | a, -1)
+                # Medium int results: AND of two positive 30-bit values
+                self.assertEqual(0x1000_0000 & 0x0FFF_FFFF, 0)
+                self.assertEqual(0x1000_0000 | 0x0FFF_FFFF, 0x1FFF_FFFF)
+                self.assertEqual(0x1000_0000 ^ 0x0FFF_FFFF, 0x1FFF_FFFF)
+
+        binary_op_bitwise_extend_signs()
+        self.assert_specialized(binary_op_bitwise_extend_signs, "BINARY_OP_EXTEND")
+        self.assert_no_opcode(binary_op_bitwise_extend_signs, "BINARY_OP")
+
     @cpython_only
     @requires_specialization
     @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')

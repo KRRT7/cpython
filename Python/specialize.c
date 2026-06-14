@@ -2154,7 +2154,15 @@ compactlongs_guard(PyObject *lhs, PyObject *rhs)
     { \
         Py_ssize_t rhs_val = _PyLong_CompactValue((PyLongObject *)rhs); \
         Py_ssize_t lhs_val = _PyLong_CompactValue((PyLongObject *)lhs); \
-        return PyLong_FromSsize_t(lhs_val OP rhs_val); \
+        Py_ssize_t res = lhs_val OP rhs_val; \
+        /* Bitwise on two compact values is always compact, so the result \
+           fits in a small or medium int. Handle the small-int case inline \
+           to avoid PyLong_FromSsize_t() overhead on the hot path; the \
+           medium-int path is rare enough that PyLong_FromSsize_t is fine. */ \
+        if (_PY_IS_SMALL_INT(res)) { \
+            return (PyObject *)&_PyLong_SMALL_INTS[_PY_NSMALLNEGINTS + res]; \
+        } \
+        return PyLong_FromSsize_t(res); \
     }
 BITWISE_LONGS_ACTION(compactlongs_or, |)
 BITWISE_LONGS_ACTION(compactlongs_and, &)
