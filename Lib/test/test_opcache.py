@@ -2,6 +2,7 @@ import collections
 import copy
 import pickle
 import dis
+import sys
 import threading
 import types
 import unittest
@@ -1376,6 +1377,18 @@ class TestSpecializer(TestBase):
         self.assert_specialized(binary_op_add_int, "BINARY_OP_ADD_INT")
         self.assert_no_opcode(binary_op_add_int, "BINARY_OP")
 
+        def binary_op_add_int_two_digit_result():
+            max_digit = (1 << sys.int_info.bits_per_digit) - 1
+            for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                a, b = max_digit, max_digit
+                c = a + b
+                self.assertEqual(c, max_digit * 2)
+
+        binary_op_add_int_two_digit_result()
+        self.assert_specialized(
+            binary_op_add_int_two_digit_result, "BINARY_OP_ADD_INT"
+        )
+
         def binary_op_int_wide_add():
             for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
                 a, b = 10000000000, 1
@@ -1423,6 +1436,18 @@ class TestSpecializer(TestBase):
         binary_op_int_wide_sub_small_result()
         self.assert_specialized(
             binary_op_int_wide_sub_small_result, "BINARY_OP_SUBTRACT_INT_WIDE"
+        )
+
+        def binary_op_sub_int_two_digit_result():
+            max_digit = (1 << sys.int_info.bits_per_digit) - 1
+            for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                a, b = -max_digit, max_digit
+                c = a - b
+                self.assertEqual(c, -max_digit * 2)
+
+        binary_op_sub_int_two_digit_result()
+        self.assert_specialized(
+            binary_op_sub_int_two_digit_result, "BINARY_OP_SUBTRACT_INT"
         )
 
         def binary_op_int_non_compact_mul():
@@ -1615,6 +1640,67 @@ class TestSpecializer(TestBase):
                     raise AssertionError("MemoryError not raised")
             finally:
                 _testcapi.remove_mem_hooks()
+        """
+        script_helper.assert_python_ok("-c", code)
+
+    @cpython_only
+    @requires_specialization
+    @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')
+    def test_binary_op_compact_add_sub_two_digit_result_no_memory(self):
+        code = """if 1:
+            import dis
+            import sys
+            import _testcapi
+            import _testinternalcapi
+
+            def add_overflow(a, b):
+                return a + b
+
+            def subtract_overflow(a, b):
+                return a - b
+
+            max_digit = (1 << sys.int_info.bits_per_digit) - 1
+            cases = [
+                (
+                    add_overflow,
+                    (max_digit, max_digit),
+                    max_digit * 2,
+                    "BINARY_OP_ADD_INT",
+                ),
+                (
+                    subtract_overflow,
+                    (-max_digit, max_digit),
+                    -max_digit * 2,
+                    "BINARY_OP_SUBTRACT_INT",
+                ),
+            ]
+
+            for func, args, expected, opname in cases:
+                for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                    assert func(*args) == expected
+
+                opnames = {
+                    instruction.opname
+                    for instruction in dis.get_instructions(func, adaptive=True)
+                }
+                assert opname in opnames, opnames
+
+                try:
+                    _testcapi.set_nomemory(0, 1)
+                    assert func(*args) == expected
+                finally:
+                    _testcapi.remove_mem_hooks()
+
+                try:
+                    _testcapi.set_nomemory(0, 2)
+                    try:
+                        func(*args)
+                    except MemoryError:
+                        pass
+                    else:
+                        raise AssertionError("MemoryError not raised")
+                finally:
+                    _testcapi.remove_mem_hooks()
         """
         script_helper.assert_python_ok("-c", code)
 

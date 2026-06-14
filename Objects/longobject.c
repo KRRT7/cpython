@@ -357,6 +357,61 @@ medium_from_stwodigits(stwodigits x)
     return PyStackRef_FromPyObjectStealMortal((PyObject *)v);
 }
 
+static inline _PyStackRef
+compact_addsub_result_stwodigits(stwodigits x)
+{
+    if (IS_SMALL_INT(x)) {
+        return PyStackRef_FromPyObjectBorrow(get_small_int((sdigit)x));
+    }
+    assert(x != 0);
+    if (is_medium_int(x)) {
+        PyLongObject *v = (PyLongObject *)_Py_FREELIST_POP(PyLongObject, ints);
+        if (v == NULL) {
+            v = PyObject_Malloc(sizeof(PyLongObject));
+            if (v == NULL) {
+                return PyStackRef_NULL;
+            }
+            _PyObject_Init((PyObject*)v, &PyLong_Type);
+            _PyLong_InitTag(v);
+        }
+        digit abs_x = x < 0 ? (digit)(-x) : (digit)x;
+        _PyLong_SetSignAndDigitCount(v, x<0?-1:1, 1);
+        v->long_value.ob_digit[0] = abs_x;
+        return PyStackRef_FromPyObjectStealMortal((PyObject *)v);
+    }
+    twodigits abs_x;
+    int sign;
+    if (x < 0) {
+        abs_x = 0U - (twodigits)x;
+        sign = -1;
+    }
+    else {
+        abs_x = (twodigits)x;
+        sign = 1;
+    }
+    Py_ssize_t ndigits = 2;
+    twodigits t = abs_x >> (PyLong_SHIFT * 2);
+    while (t) {
+        ++ndigits;
+        t >>= PyLong_SHIFT;
+    }
+    PyLongObject *v = PyObject_Malloc(
+        offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
+    if (v == NULL) {
+        return PyStackRef_NULL;
+    }
+    _PyObject_Init((PyObject*)v, &PyLong_Type);
+    _PyLong_InitTag(v);
+    _PyLong_SetSignAndDigitCount(v, sign, ndigits);
+    t = abs_x;
+    digit *p = v->long_value.ob_digit;
+    while (t) {
+        *p++ = Py_SAFE_DOWNCAST(t & PyLong_MASK, twodigits, digit);
+        t >>= PyLong_SHIFT;
+    }
+    return PyStackRef_FromPyObjectStealMortal((PyObject *)v);
+}
+
 
 /* If a freshly-allocated int is already shared, it must
    be a small integer, so negating it must go to PyLong_FromLong */
@@ -3876,7 +3931,7 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
 {
     assert(_PyLong_BothAreCompact(a, b));
     stwodigits v = medium_value(a) + medium_value(b);
-    return medium_from_stwodigits(v);
+    return compact_addsub_result_stwodigits(v);
 }
 
 static inline _PyStackRef
@@ -4015,7 +4070,7 @@ _PyCompactLong_Subtract(PyLongObject *a, PyLongObject *b)
 {
     assert(_PyLong_BothAreCompact(a, b));
     stwodigits v = medium_value(a) - medium_value(b);
-    return medium_from_stwodigits(v);
+    return compact_addsub_result_stwodigits(v);
 }
 
 _PyStackRef
