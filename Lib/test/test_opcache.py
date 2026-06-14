@@ -1646,6 +1646,59 @@ class TestSpecializer(TestBase):
     @cpython_only
     @requires_specialization
     @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')
+    def test_binary_op_wide_result_no_memory(self):
+        code = """if 1:
+            import dis
+            import _testcapi
+            import _testinternalcapi
+
+            def add_wide_result(a, b):
+                return a + b
+
+            def subtract_wide_result(a, b):
+                return a - b
+
+            cases = [
+                (
+                    add_wide_result,
+                    (10_000_000_000, 1),
+                    10_000_000_001,
+                    "BINARY_OP_ADD_INT_WIDE",
+                ),
+                (
+                    subtract_wide_result,
+                    (10_000_000_000, 1),
+                    9_999_999_999,
+                    "BINARY_OP_SUBTRACT_INT_WIDE",
+                ),
+            ]
+
+            for func, args, expected, opname in cases:
+                for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+                    assert func(*args) == expected
+
+                opnames = {
+                    instruction.opname
+                    for instruction in dis.get_instructions(func, adaptive=True)
+                }
+                assert opname in opnames, opnames
+
+                try:
+                    _testcapi.set_nomemory(0, 1)
+                    try:
+                        func(*args)
+                    except MemoryError:
+                        pass
+                    else:
+                        raise AssertionError("MemoryError not raised")
+                finally:
+                    _testcapi.remove_mem_hooks()
+        """
+        script_helper.assert_python_ok("-c", code)
+
+    @cpython_only
+    @requires_specialization
+    @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')
     def test_binary_op_compact_add_sub_two_digit_result_no_memory(self):
         code = """if 1:
             import dis

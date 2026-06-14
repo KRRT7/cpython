@@ -3937,12 +3937,58 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
 static inline _PyStackRef
 wide_int_result_stwodigits(int64_t v)
 {
-    PyLongObject *result;
-    result = _PyLong_FromSTwoDigits(v);
+    if (IS_SMALL_INT(v)) {
+        return PyStackRef_FromPyObjectBorrow(get_small_int((sdigit)v));
+    }
+    assert(v != 0);
+    if (is_medium_int(v)) {
+        PyLongObject *result = (PyLongObject *)_Py_FREELIST_POP(PyLongObject, ints);
+        if (result == NULL) {
+            result = PyObject_Malloc(sizeof(PyLongObject));
+            if (result == NULL) {
+                PyErr_NoMemory();
+                return PyStackRef_ERROR;
+            }
+            _PyObject_Init((PyObject*)result, &PyLong_Type);
+            _PyLong_InitTag(result);
+        }
+        digit abs_v = v < 0 ? (digit)(-v) : (digit)v;
+        _PyLong_SetSignAndDigitCount(result, v<0?-1:1, 1);
+        result->long_value.ob_digit[0] = abs_v;
+        return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
+    }
+    twodigits abs_v;
+    int sign;
+    if (v < 0) {
+        abs_v = 0U - (twodigits)v;
+        sign = -1;
+    }
+    else {
+        abs_v = (twodigits)v;
+        sign = 1;
+    }
+    Py_ssize_t ndigits = 2;
+    twodigits t = abs_v >> (PyLong_SHIFT * 2);
+    while (t) {
+        ++ndigits;
+        t >>= PyLong_SHIFT;
+    }
+    PyLongObject *result = PyObject_Malloc(
+        offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
     if (result == NULL) {
+        PyErr_NoMemory();
         return PyStackRef_ERROR;
     }
-    return PyStackRef_FromPyObjectSteal((PyObject *)result);
+    _PyObject_Init((PyObject*)result, &PyLong_Type);
+    _PyLong_InitTag(result);
+    _PyLong_SetSignAndDigitCount(result, sign, ndigits);
+    t = abs_v;
+    digit *p = result->long_value.ob_digit;
+    while (t) {
+        *p++ = Py_SAFE_DOWNCAST(t & PyLong_MASK, twodigits, digit);
+        t >>= PyLong_SHIFT;
+    }
+    return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
 }
 
 // Decode an exact int directly into int64_t for the wide exact-int fast path.
