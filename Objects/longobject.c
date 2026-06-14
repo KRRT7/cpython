@@ -3937,6 +3937,8 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
 static inline _PyStackRef
 wide_int_result_stwodigits(int64_t v)
 {
+    // Similar to compact_addsub_result_stwodigits(), but allocation failures
+    // are errors here instead of fallback signals.
     if (IS_SMALL_INT(v)) {
         return PyStackRef_FromPyObjectBorrow(get_small_int((sdigit)v));
     }
@@ -4142,7 +4144,8 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
         }
     }
     else {
-        res = left - right;
+        uint64_t ures = (uint64_t)left - (uint64_t)right;
+        res = (int64_t)ures;
         if ((res ^ left) < 0) {
             PyLongObject *result = long_sub(a, b);
             if (result == NULL) {

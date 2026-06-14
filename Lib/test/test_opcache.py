@@ -1645,6 +1645,22 @@ class TestSpecializer(TestBase):
 
     @cpython_only
     @requires_specialization
+    def test_binary_op_subtract_wide_negative_overflow(self):
+        def subtract_overflow(a, b):
+            return a - b
+
+        a = -(1 << 63)
+        b = 1
+        for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
+            self.assertEqual(subtract_overflow(a, b), -(1 << 63) - 1)
+
+        self.assert_specialized(
+            subtract_overflow, "BINARY_OP_SUBTRACT_INT_WIDE"
+        )
+        self.assertEqual(subtract_overflow(a, b), -(1 << 63) - 1)
+
+    @cpython_only
+    @requires_specialization
     @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')
     def test_binary_op_wide_result_no_memory(self):
         code = """if 1:
