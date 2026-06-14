@@ -389,12 +389,8 @@ compact_addsub_result_stwodigits(stwodigits x)
         abs_x = (twodigits)x;
         sign = 1;
     }
-    Py_ssize_t ndigits = 2;
-    twodigits t = abs_x >> (PyLong_SHIFT * 2);
-    while (t) {
-        ++ndigits;
-        t >>= PyLong_SHIFT;
-    }
+    int bit_length = 64 - __builtin_clzll(abs_x);
+    Py_ssize_t ndigits = (bit_length + PyLong_SHIFT - 1) / PyLong_SHIFT;
     PyLongObject *v = PyObject_Malloc(
         offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
     if (v == NULL) {
@@ -403,11 +399,10 @@ compact_addsub_result_stwodigits(stwodigits x)
     _PyObject_Init((PyObject*)v, &PyLong_Type);
     _PyLong_InitTag(v);
     _PyLong_SetSignAndDigitCount(v, sign, ndigits);
-    t = abs_x;
     digit *p = v->long_value.ob_digit;
-    while (t) {
-        *p++ = Py_SAFE_DOWNCAST(t & PyLong_MASK, twodigits, digit);
-        t >>= PyLong_SHIFT;
+    while (abs_x) {
+        *p++ = Py_SAFE_DOWNCAST(abs_x & PyLong_MASK, twodigits, digit);
+        abs_x >>= PyLong_SHIFT;
     }
     return PyStackRef_FromPyObjectStealMortal((PyObject *)v);
 }
@@ -3970,12 +3965,8 @@ static inline Py_ALWAYS_INLINE _PyStackRef
 wide_int_result_from_uint64(uint64_t abs_v, int sign)
 {
     assert(abs_v != 0);
-    Py_ssize_t ndigits = 2;
-    uint64_t t = abs_v >> (PyLong_SHIFT * 2);
-    while (t) {
-        ++ndigits;
-        t >>= PyLong_SHIFT;
-    }
+    int bit_length = 64 - __builtin_clzll(abs_v);
+    Py_ssize_t ndigits = (bit_length + PyLong_SHIFT - 1) / PyLong_SHIFT;
     PyLongObject *result = PyObject_Malloc(
         offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
     if (result == NULL) {
@@ -3985,17 +3976,16 @@ wide_int_result_from_uint64(uint64_t abs_v, int sign)
     _PyObject_Init((PyObject*)result, &PyLong_Type);
     _PyLong_InitTag(result);
     _PyLong_SetSignAndDigitCount(result, sign, ndigits);
-    t = abs_v;
     digit *p = result->long_value.ob_digit;
-    while (t) {
-        *p++ = Py_SAFE_DOWNCAST(t & PyLong_MASK, uint64_t, digit);
-        t >>= PyLong_SHIFT;
+    while (abs_v) {
+        *p++ = Py_SAFE_DOWNCAST(abs_v & PyLong_MASK, uint64_t, digit);
+        abs_v >>= PyLong_SHIFT;
     }
     return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
 }
 
 // Decode an exact int directly into int64_t for the wide exact-int fast path.
-static inline int
+static inline Py_ALWAYS_INLINE int
 _PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
 {
     assert(PyLong_CheckExact((PyObject *)v));
@@ -4035,21 +4025,18 @@ _PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
             return 0;
     }
     if (LIKELY(!_PyLong_IsNegative(v))) {
-        if (value <= (uint64_t)INT64_MAX) {
-            *out = (int64_t)value;
-            return 1;
+        if (value > (uint64_t)INT64_MAX) {
+            return 0;
         }
+        *out = (int64_t)value;
+        return 1;
+    }
+    // value <= INT64_MAX fits as -(value), value == INT64_MAX + 1 is INT64_MIN.
+    if (value > (uint64_t)INT64_MAX + 1) {
         return 0;
     }
-    if (value <= (uint64_t)INT64_MAX) {
-        *out = -(int64_t)value;
-        return 1;
-    }
-    if (value == (uint64_t)INT64_MAX + 1) {
-        *out = INT64_MIN;
-        return 1;
-    }
-    return 0;
+    *out = -(int64_t)value;
+    return 1;
 }
 
 _PyStackRef
@@ -4150,10 +4137,10 @@ _PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
         }
     }
     else {
-        uint64_t abs_v = (0U - (uint64_t)left) + (uint64_t)right;
         uint64_t ures = (uint64_t)left - (uint64_t)right;
         res = (int64_t)ures;
         if ((res ^ left) < 0) {
+            uint64_t abs_v = (0U - (uint64_t)left) + (uint64_t)right;
             return wide_int_result_from_uint64(abs_v, -1);
         }
     }
