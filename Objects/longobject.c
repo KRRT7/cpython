@@ -357,7 +357,7 @@ medium_from_stwodigits(stwodigits x)
     return PyStackRef_FromPyObjectStealMortal((PyObject *)v);
 }
 
-static inline _PyStackRef
+static inline Py_ALWAYS_INLINE _PyStackRef
 compact_addsub_result_stwodigits(stwodigits x)
 {
     if (IS_SMALL_INT(x)) {
@@ -374,9 +374,9 @@ compact_addsub_result_stwodigits(stwodigits x)
             _PyObject_Init((PyObject*)v, &PyLong_Type);
             _PyLong_InitTag(v);
         }
-        digit abs_x = x < 0 ? (digit)(-x) : (digit)x;
+        digit digit_abs = x < 0 ? (digit)(-x) : (digit)x;
         _PyLong_SetSignAndDigitCount(v, x<0?-1:1, 1);
-        v->long_value.ob_digit[0] = abs_x;
+        v->long_value.ob_digit[0] = digit_abs;
         return PyStackRef_FromPyObjectStealMortal((PyObject *)v);
     }
     twodigits abs_x;
@@ -3934,9 +3934,9 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
     return compact_addsub_result_stwodigits(v);
 }
 
-static inline _PyStackRef wide_int_result_from_uint64(uint64_t abs_v, int sign);
+static inline Py_ALWAYS_INLINE _PyStackRef wide_int_result_from_uint64(uint64_t abs_v, int sign);
 
-static inline _PyStackRef
+static inline Py_ALWAYS_INLINE _PyStackRef
 wide_int_result_stwodigits(int64_t v)
 {
     // Similar to compact_addsub_result_stwodigits(), but allocation failures
@@ -3956,9 +3956,9 @@ wide_int_result_stwodigits(int64_t v)
             _PyObject_Init((PyObject*)result, &PyLong_Type);
             _PyLong_InitTag(result);
         }
-        digit abs_v = v < 0 ? (digit)(-v) : (digit)v;
+        digit digit_abs = v < 0 ? (digit)(-v) : (digit)v;
         _PyLong_SetSignAndDigitCount(result, v<0?-1:1, 1);
-        result->long_value.ob_digit[0] = abs_v;
+        result->long_value.ob_digit[0] = digit_abs;
         return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
     }
     uint64_t abs_v = v < 0 ? 0U - (uint64_t)v : (uint64_t)v;
@@ -3966,7 +3966,7 @@ wide_int_result_stwodigits(int64_t v)
     return wide_int_result_from_uint64(abs_v, sign);
 }
 
-static inline _PyStackRef
+static inline Py_ALWAYS_INLINE _PyStackRef
 wide_int_result_from_uint64(uint64_t abs_v, int sign)
 {
     assert(abs_v != 0);

@@ -12,6 +12,10 @@ from test.support import (threading_helper, check_impl_detail, script_helper,
                           cpython_only, requires_jit_disabled, reset_code)
 from test.support.import_helper import import_module
 
+# Exact-int boundaries used by the wide exact-int specialization tests.
+_INT64_MAX = (1 << 63) - 1
+_INT64_MIN = -(1 << 63)
+
 # Skip this module on other interpreters, it is cpython specific:
 if check_impl_detail(cpython=False):
     raise unittest.SkipTest('implementation detail specific to cpython')
@@ -1609,25 +1613,28 @@ class TestSpecializer(TestBase):
     @requires_specialization
     @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')
     def test_binary_op_subtract_wide_overflow_no_memory(self):
-        code = """if 1:
+        code = f"""if 1:
             import dis
             import _testcapi
             import _testinternalcapi
 
+            INT64_MAX = {_INT64_MAX!r}
+            INT64_MIN = {_INT64_MIN!r}
+
             def subtract_overflow(a, b):
                 return a - b
 
-            a = (1 << 63) - 1
+            a = INT64_MAX
             b = -1
             for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
-                assert subtract_overflow(a, b) == 1 << 63
+                assert subtract_overflow(a, b) == -INT64_MIN
 
-            opnames = {
+            opnames = {{
                 instruction.opname
                 for instruction in dis.get_instructions(
                     subtract_overflow, adaptive=True
                 )
-            }
+            }}
             assert "BINARY_OP_SUBTRACT_INT_WIDE" in opnames, opnames
 
             try:
@@ -1649,24 +1656,28 @@ class TestSpecializer(TestBase):
         def subtract_overflow(a, b):
             return a - b
 
-        a = -(1 << 63)
+        a = _INT64_MIN
         b = 1
+        expected = _INT64_MIN - 1
         for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
-            self.assertEqual(subtract_overflow(a, b), -(1 << 63) - 1)
+            self.assertEqual(subtract_overflow(a, b), expected)
 
         self.assert_specialized(
             subtract_overflow, "BINARY_OP_SUBTRACT_INT_WIDE"
         )
-        self.assertEqual(subtract_overflow(a, b), -(1 << 63) - 1)
+        self.assertEqual(subtract_overflow(a, b), expected)
 
     @cpython_only
     @requires_specialization
     @unittest.skipIf(support.Py_TRACE_REFS, 'cannot test Py_TRACE_REFS build')
     def test_binary_op_wide_result_no_memory(self):
-        code = """if 1:
+        code = f"""if 1:
             import dis
             import _testcapi
             import _testinternalcapi
+
+            INT64_MAX = {_INT64_MAX!r}
+            INT64_MIN = {_INT64_MIN!r}
 
             def add_wide_result(a, b):
                 return a + b
@@ -1683,14 +1694,14 @@ class TestSpecializer(TestBase):
                 ),
                 (
                     add_wide_result,
-                    ((1 << 63) - 1, 1),
-                    1 << 63,
+                    (INT64_MAX, 1),
+                    -INT64_MIN,
                     "BINARY_OP_ADD_INT_WIDE",
                 ),
                 (
                     add_wide_result,
-                    (-(1 << 63), -1),
-                    -(1 << 63) - 1,
+                    (INT64_MIN, -1),
+                    INT64_MIN - 1,
                     "BINARY_OP_ADD_INT_WIDE",
                 ),
                 (
@@ -1699,16 +1710,22 @@ class TestSpecializer(TestBase):
                     9_999_999_999,
                     "BINARY_OP_SUBTRACT_INT_WIDE",
                 ),
+                (
+                    subtract_wide_result,
+                    (INT64_MIN, 1),
+                    INT64_MIN - 1,
+                    "BINARY_OP_SUBTRACT_INT_WIDE",
+                ),
             ]
 
             for func, args, expected, opname in cases:
                 for _ in range(_testinternalcapi.SPECIALIZATION_THRESHOLD):
                     assert func(*args) == expected
 
-                opnames = {
+                opnames = {{
                     instruction.opname
                     for instruction in dis.get_instructions(func, adaptive=True)
-                }
+                }}
                 assert opname in opnames, opnames
 
                 try:
