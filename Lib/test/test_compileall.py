@@ -1107,6 +1107,8 @@ class HardlinkDedupTestsBase:
 
             # Change of the module content
             script = self.make_script("print(0)")
+            os.utime(script, (os.stat(script).st_mtime + 1,
+                              os.stat(script).st_mtime + 1))
 
             # Recompilation without -o 1
             self.compile_dir(optimize=[0, 2], force=True)
@@ -1132,10 +1134,16 @@ class HardlinkDedupTestsBase:
 
             # Change of the module content
             script = self.make_script("print(0)", name="module")
+            # Ensure that the mtime of the source file is strictly greater
+            # than the mtime of the existing pyc file.
+            os.utime(script, (os.stat(script).st_mtime + 1,
+                              os.stat(script).st_mtime + 1))
 
             # Import the module in Python with -O (optimization level 1)
+            # and force bytecode writing even if the environment disables it.
             script_helper.assert_python_ok(
-                "-O", "-c", "import module", __isolated=False, PYTHONPATH=self.path
+                "-O", "-c", "import sys; sys.dont_write_bytecode=False; import module",
+                __isolated=False, PYTHONPATH=self.path
             )
 
             # Only opt-1.pyc is changed
