@@ -180,6 +180,35 @@ _Py_bit_length(unsigned long x)
 }
 
 
+static inline int
+_Py_bit_length64(uint64_t x)
+{
+#if (defined(__clang__) || defined(__GNUC__))
+    if (x != 0) {
+        return 64 - __builtin_clzll(x);
+    }
+    else {
+        return 0;
+    }
+#elif defined(_MSC_VER)
+    unsigned long msb;
+    if (_BitScanReverse64(&msb, x)) {
+        return (int)msb + 1;
+    }
+    else {
+        return 0;
+    }
+#else
+    int msb = 0;
+    if (x >= (1ULL << 32)) {
+        msb += 32;
+        x >>= 32;
+    }
+    return msb + _Py_bit_length((unsigned long)x);
+#endif
+}
+
+
 #ifdef __cplusplus
 }
 #endif

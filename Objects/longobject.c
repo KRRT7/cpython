@@ -24,12 +24,6 @@ class int "PyObject *" "&PyLong_Type"
 [clinic start generated code]*/
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=ec0275e3422a36e3]*/
 
-#if (defined(__clang__) || (defined(__GNUC__) && (__GNUC__ > 2))) && defined(__OPTIMIZE__)
-#  define LIKELY(value) __builtin_expect((value), 1)
-#else
-#  define LIKELY(value) (value)
-#endif
-
 #define medium_value(x) ((stwodigits)_PyLong_CompactValue(x))
 
 #define IS_SMALL_INT(ival) _PY_IS_SMALL_INT(ival)
@@ -43,8 +37,6 @@ class int "PyObject *" "&PyLong_Type"
 
 // Forward declarations
 static PyLongObject* long_neg(PyLongObject *v);
-static PyLongObject *long_add(PyLongObject *a, PyLongObject *b);
-static PyLongObject *long_sub(PyLongObject *a, PyLongObject *b);
 static PyLongObject *x_divrem(PyLongObject *, PyLongObject *, PyLongObject **);
 static PyObject* long_long(PyObject *v);
 static PyObject* long_lshift_int64(PyLongObject *a, int64_t shiftby);
@@ -55,14 +47,6 @@ _Py_DECREF_INT(PyLongObject *op)
 {
     assert(PyLong_CheckExact(op));
     _Py_DECREF_SPECIALIZED((PyObject *)op, _PyLong_ExactDealloc);
-}
-
-static inline int
-is_medium_int(stwodigits x)
-{
-    /* Take care that we are comparing unsigned values. */
-    twodigits x_plus_mask = ((twodigits)x) + PyLong_MASK;
-    return x_plus_mask < ((twodigits)PyLong_MASK) + PyLong_BASE;
 }
 
 static PyObject *
@@ -389,7 +373,7 @@ compact_addsub_result_stwodigits(stwodigits x)
         abs_x = (twodigits)x;
         sign = 1;
     }
-    int bit_length = 64 - __builtin_clzll(abs_x);
+    int bit_length = _Py_bit_length64(abs_x);
     Py_ssize_t ndigits = (bit_length + PyLong_SHIFT - 1) / PyLong_SHIFT;
     PyLongObject *v = PyObject_Malloc(
         offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
@@ -3928,121 +3912,6 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
     stwodigits v = medium_value(a) + medium_value(b);
     return compact_addsub_result_stwodigits(v);
 }
-
-static inline Py_ALWAYS_INLINE _PyStackRef wide_int_result_from_uint64(uint64_t abs_v, int sign);
-
-static inline Py_ALWAYS_INLINE _PyStackRef
-wide_int_result_stwodigits(int64_t v)
-{
-    // Similar to compact_addsub_result_stwodigits(), but allocation failures
-    // are errors here instead of fallback signals.
-    if (IS_SMALL_INT(v)) {
-        return PyStackRef_FromPyObjectBorrow(get_small_int((sdigit)v));
-    }
-    assert(v != 0);
-    if (is_medium_int(v)) {
-        PyLongObject *result = (PyLongObject *)_Py_FREELIST_POP(PyLongObject, ints);
-        if (result == NULL) {
-            result = PyObject_Malloc(sizeof(PyLongObject));
-            if (result == NULL) {
-                PyErr_NoMemory();
-                return PyStackRef_ERROR;
-            }
-            _PyObject_Init((PyObject*)result, &PyLong_Type);
-            _PyLong_InitTag(result);
-        }
-        digit digit_abs = v < 0 ? (digit)(-v) : (digit)v;
-        _PyLong_SetSignAndDigitCount(result, v<0?-1:1, 1);
-        result->long_value.ob_digit[0] = digit_abs;
-        return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
-    }
-    uint64_t abs_v = v < 0 ? 0U - (uint64_t)v : (uint64_t)v;
-    int sign = v < 0 ? -1 : 1;
-    return wide_int_result_from_uint64(abs_v, sign);
-}
-
-static inline Py_ALWAYS_INLINE _PyStackRef
-wide_int_result_from_uint64(uint64_t abs_v, int sign)
-{
-    assert(abs_v != 0);
-    int bit_length = 64 - __builtin_clzll(abs_v);
-    Py_ssize_t ndigits = (bit_length + PyLong_SHIFT - 1) / PyLong_SHIFT;
-    PyLongObject *result = PyObject_Malloc(
-        offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
-    if (result == NULL) {
-        PyErr_NoMemory();
-        return PyStackRef_ERROR;
-    }
-    _PyObject_Init((PyObject*)result, &PyLong_Type);
-    _PyLong_InitTag(result);
-    _PyLong_SetSignAndDigitCount(result, sign, ndigits);
-    digit *p = result->long_value.ob_digit;
-    while (abs_v) {
-        *p++ = Py_SAFE_DOWNCAST(abs_v & PyLong_MASK, uint64_t, digit);
-        abs_v >>= PyLong_SHIFT;
-    }
-    return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
-}
-
-// Decode an exact int directly into int64_t for the wide exact-int fast path.
-static inline Py_ALWAYS_INLINE int
-_PyLong_ExactToInt64(const PyLongObject *v, int64_t *out)
-{
-    assert(PyLong_CheckExact((PyObject *)v));
-    if (_PyLong_IsCompact(v)) {
-        *out = _PyLong_CompactValue(v);
-        return 1;
-    }
-    Py_ssize_t ndigits = _PyLong_DigitCount(v);
-    uint64_t value;
-    const digit *digits = v->long_value.ob_digit;
-    switch (ndigits) {
-#if PYLONG_BITS_IN_DIGIT == 15
-        case 5:
-            value = digits[4];
-            value = (value << PyLong_SHIFT) | digits[3];
-            value = (value << PyLong_SHIFT) | digits[2];
-            value = (value << PyLong_SHIFT) | digits[1];
-            value = (value << PyLong_SHIFT) | digits[0];
-            break;
-        case 4:
-            value = digits[3];
-            value = (value << PyLong_SHIFT) | digits[2];
-            value = (value << PyLong_SHIFT) | digits[1];
-            value = (value << PyLong_SHIFT) | digits[0];
-            break;
-#endif
-        case 3:
-            value = ((uint64_t)digits[2] << (PyLong_SHIFT * 2))
-                    | ((uint64_t)digits[1] << PyLong_SHIFT)
-                    | (uint64_t)digits[0];
-            break;
-        case 2:
-            value = ((uint64_t)digits[1] << PyLong_SHIFT)
-                    | (uint64_t)digits[0];
-            break;
-        default:
-            return 0;
-    }
-    if (LIKELY(!_PyLong_IsNegative(v))) {
-        if (value > (uint64_t)INT64_MAX) {
-            return 0;
-        }
-        *out = (int64_t)value;
-        return 1;
-    }
-    // value <= INT64_MAX fits as -(value), value == INT64_MAX + 1 is INT64_MIN.
-    if (value > (uint64_t)INT64_MAX + 1) {
-        return 0;
-    }
-    *out = -(int64_t)value;
-    return 1;
-}
-
-// The wide-int fast paths (_PyCompactLong_AddWide,
-// _PyCompactLong_SubtractWide) are defined as static inline functions
-// in pycore_long.h so the bytecode interpreter can inline them at the
-// use site.
 
 static PyObject *
 long_add_method(PyObject *a, PyObject *b)

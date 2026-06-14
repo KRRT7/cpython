@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 #include "pycore_bytesobject.h"   // _PyBytesWriter
+#include "pycore_bitutils.h"      // _Py_bit_length
 #include "pycore_freelist.h"     // _Py_FREELIST_POP
 #include "pycore_object.h"       // _PyObject_Init
 #include "pycore_runtime.h"       // _Py_SINGLETON()
@@ -391,8 +392,24 @@ _PyLong_FitsInt64(const PyLongObject *op)
     return 1;
 }
 
+#if (defined(__clang__) || (defined(__GNUC__) && (__GNUC__ > 2))) && defined(__OPTIMIZE__)
+#  define LIKELY(value) __builtin_expect((value), 1)
+#  define UNLIKELY(value) __builtin_expect((value), 0)
+#else
+#  define LIKELY(value) (value)
+#  define UNLIKELY(value) (value)
+#endif
+
 static inline int
-_PyLong_CheckExactAndFitsInt64CheckExact(PyObject *op)
+is_medium_int(int64_t x)
+{
+    /* Take care that we are comparing unsigned values. */
+    uint64_t x_plus_mask = ((uint64_t)x) + PyLong_MASK;
+    return x_plus_mask < ((uint64_t)PyLong_MASK) + PyLong_BASE;
+}
+
+static inline int
+_PyLong_IsExactInt64(PyObject *op)
 {
     return PyLong_CheckExact(op) && _PyLong_FitsInt64((const PyLongObject *)op);
 }
@@ -415,6 +432,9 @@ _PyLong_ExactToInt64_inline(const PyLongObject *v, int64_t *out)
     switch (ndigits) {
 #if PYLONG_BITS_IN_DIGIT == 15
         case 5:
+            if (digits[4] > (uint64_t)UINT64_MAX >> (PyLong_SHIFT * 4)) {
+                return 0;
+            }
             value = digits[4];
             value = (value << PyLong_SHIFT) | digits[3];
             value = (value << PyLong_SHIFT) | digits[2];
@@ -429,6 +449,9 @@ _PyLong_ExactToInt64_inline(const PyLongObject *v, int64_t *out)
             break;
 #endif
         case 3:
+            if (digits[2] > (uint64_t)UINT64_MAX >> (PyLong_SHIFT * 2)) {
+                return 0;
+            }
             value = ((uint64_t)digits[2] << (PyLong_SHIFT * 2))
                     | ((uint64_t)digits[1] << PyLong_SHIFT)
                     | (uint64_t)digits[0];
@@ -440,7 +463,7 @@ _PyLong_ExactToInt64_inline(const PyLongObject *v, int64_t *out)
         default:
             return 0;
     }
-    if (!_PyLong_IsNegative(v)) {
+    if (LIKELY(!_PyLong_IsNegative(v))) {
         if (value > (uint64_t)INT64_MAX) {
             return 0;
         }
@@ -451,7 +474,7 @@ _PyLong_ExactToInt64_inline(const PyLongObject *v, int64_t *out)
     if (value > (uint64_t)INT64_MAX + 1) {
         return 0;
     }
-    *out = -(int64_t)value;
+    *out = (int64_t)(0ULL - value);
     return 1;
 }
 
@@ -459,7 +482,7 @@ static inline Py_ALWAYS_INLINE _PyStackRef
 wide_int_result_from_uint64_inline(uint64_t abs_v, int sign)
 {
     assert(abs_v != 0);
-    int bit_length = 64 - __builtin_clzll(abs_v);
+    int bit_length = _Py_bit_length64(abs_v);
     Py_ssize_t ndigits = (bit_length + PyLong_SHIFT - 1) / PyLong_SHIFT;
     PyLongObject *result = PyObject_Malloc(
         offsetof(PyLongObject, long_value.ob_digit) + ndigits * sizeof(digit));
@@ -485,8 +508,26 @@ wide_int_result_stwodigits_inline(int64_t v)
         return PyStackRef_FromPyObjectBorrow(
             (PyObject *)&_PyLong_SMALL_INTS[_PY_NSMALLNEGINTS + v]);
     }
-    return wide_int_result_from_uint64_inline(
-        v < 0 ? 0U - (uint64_t)v : (uint64_t)v, v < 0 ? -1 : 1);
+    assert(v != 0);
+    if (is_medium_int(v)) {
+        PyLongObject *result = (PyLongObject *)_Py_FREELIST_POP(PyLongObject, ints);
+        if (result == NULL) {
+            result = PyObject_Malloc(sizeof(PyLongObject));
+            if (result == NULL) {
+                PyErr_NoMemory();
+                return PyStackRef_ERROR;
+            }
+            _PyObject_Init((PyObject*)result, &PyLong_Type);
+            _PyLong_InitTag(result);
+        }
+        digit digit_abs = v < 0 ? (digit)(-v) : (digit)v;
+        _PyLong_SetSignAndDigitCount(result, v<0?-1:1, 1);
+        result->long_value.ob_digit[0] = digit_abs;
+        return PyStackRef_FromPyObjectStealMortal((PyObject *)result);
+    }
+    uint64_t abs_v = v < 0 ? 0U - (uint64_t)v : (uint64_t)v;
+    int sign = v < 0 ? -1 : 1;
+    return wide_int_result_from_uint64_inline(abs_v, sign);
 }
 
 static inline Py_ALWAYS_INLINE _PyStackRef

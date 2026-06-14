@@ -646,12 +646,12 @@ dummy_func(
 
         op(_GUARD_NOS_INT_WIDE, (left, unused -- left, unused)) {
             PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
-            EXIT_IF(!_PyLong_CheckExactAndFitsInt64CheckExact(left_o));
+            EXIT_IF(!_PyLong_IsExactInt64(left_o));
         }
 
         op(_GUARD_TOS_INT_WIDE, (value -- value)) {
             PyObject *value_o = PyStackRef_AsPyObjectBorrow(value);
-            EXIT_IF(!_PyLong_CheckExactAndFitsInt64CheckExact(value_o));
+            EXIT_IF(!_PyLong_IsExactInt64(value_o));
         }
 
         op(_GUARD_NOS_OVERFLOWED, (left, unused -- left, unused)) {
