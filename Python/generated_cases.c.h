@@ -212,17 +212,29 @@
                 PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
                 assert(PyLong_CheckExact(left_o));
                 assert(PyLong_CheckExact(right_o));
-                assert(_PyLong_BothAreCompact((PyLongObject *)left_o, (PyLongObject *)right_o));
-                STAT_INC(BINARY_OP, hit);
-                res = _PyCompactLong_Add((PyLongObject *)left_o, (PyLongObject *)right_o);
-                if (PyStackRef_IsNull(res)) {
-                    UPDATE_MISS_STATS(BINARY_OP);
-                    assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
-                    JUMP_TO_PREDICTED(BINARY_OP);
-                }
-                l = left;
-                r = right;
+            int64_t left_i;
+            int64_t right_i;
+            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
+                !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
+                UPDATE_MISS_STATS(BINARY_OP);
+                assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
+                JUMP_TO_PREDICTED(BINARY_OP);
             }
+            STAT_INC(BINARY_OP, hit);
+            int64_t sum;
+            if (__builtin_add_overflow(left_i, right_i, &sum)) {
+                UPDATE_MISS_STATS(BINARY_OP);
+                assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
+                JUMP_TO_PREDICTED(BINARY_OP);
+            }
+            PyObject *res_o = PyLong_FromInt64(sum);
+            if (res_o == NULL) {
+                JUMP_TO_LABEL(error);
+            }
+            res = PyStackRef_FromPyObjectSteal(res_o);
+            l = left;
+            r = right;
+        }
             // _POP_TOP_INT
             {
                 value = r;
@@ -1348,17 +1360,29 @@
                 PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
                 assert(PyLong_CheckExact(left_o));
                 assert(PyLong_CheckExact(right_o));
-                assert(_PyLong_BothAreCompact((PyLongObject *)left_o, (PyLongObject *)right_o));
-                STAT_INC(BINARY_OP, hit);
-                res = _PyCompactLong_Subtract((PyLongObject *)left_o, (PyLongObject *)right_o);
-                if (PyStackRef_IsNull(res)) {
-                    UPDATE_MISS_STATS(BINARY_OP);
-                    assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
-                    JUMP_TO_PREDICTED(BINARY_OP);
-                }
-                l = left;
-                r = right;
+            int64_t left_i;
+            int64_t right_i;
+            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
+                !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
+                UPDATE_MISS_STATS(BINARY_OP);
+                assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
+                JUMP_TO_PREDICTED(BINARY_OP);
             }
+            STAT_INC(BINARY_OP, hit);
+            int64_t diff;
+            if (__builtin_sub_overflow(left_i, right_i, &diff)) {
+                UPDATE_MISS_STATS(BINARY_OP);
+                assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
+                JUMP_TO_PREDICTED(BINARY_OP);
+            }
+            PyObject *res_o = PyLong_FromInt64(diff);
+            if (res_o == NULL) {
+                JUMP_TO_LABEL(error);
+            }
+            res = PyStackRef_FromPyObjectSteal(res_o);
+            l = left;
+            r = right;
+        }
             // _POP_TOP_INT
             {
                 value = r;

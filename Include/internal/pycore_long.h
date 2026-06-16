@@ -346,6 +346,54 @@ _PyLong_CheckExactAndCompact(PyObject *op)
     return PyLong_CheckExact(op) && _PyLong_IsCompact((const PyLongObject *)op);
 }
 
+static inline int
+_PyLong_CheckExactAndInt64(PyObject *op, int64_t *out)
+{
+    if (!PyLong_CheckExact(op)) {
+        return 0;
+    }
+    const PyLongObject *v = (const PyLongObject *)op;
+    Py_ssize_t ndigits = _PyLong_DigitCount(v);
+    Py_ssize_t max_digits = (64 + PyLong_SHIFT - 1) / PyLong_SHIFT;
+    if (ndigits > max_digits) {
+        return 0;
+    }
+    uint64_t value = 0;
+    for (Py_ssize_t i = ndigits; i-- > 0;) {
+        value = (value << PyLong_SHIFT) | v->long_value.ob_digit[i];
+    }
+    if (ndigits == max_digits) {
+        /* The top digit may still overflow signed int64_t. */
+        if (_PyLong_IsNegative(v)) {
+            if (value > (uint64_t)INT64_MAX + 1) {
+                return 0;
+            }
+            if (out != NULL) {
+                *out = (int64_t)(0ULL - value);
+            }
+            return 1;
+        }
+        if (value > (uint64_t)INT64_MAX) {
+            return 0;
+        }
+        if (out != NULL) {
+            *out = (int64_t)value;
+        }
+        return 1;
+    }
+    if (_PyLong_IsNegative(v)) {
+        if (out != NULL) {
+            *out = (int64_t)(0ULL - value);
+        }
+    }
+    else {
+        if (out != NULL) {
+            *out = (int64_t)value;
+        }
+    }
+    return 1;
+}
+
 #ifdef __cplusplus
 }
 #endif
