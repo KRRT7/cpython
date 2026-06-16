@@ -683,26 +683,28 @@ dummy_func(
                 r = right;
                 INPUTS_DEAD();
             }
-            int64_t left_i;
-            int64_t right_i;
-            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
-                EXIT_IF(true);
-            }
+            else {
+                int64_t left_i;
+                int64_t right_i;
+                if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
+                    !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
+                    EXIT_IF(true);
+                }
 
-            STAT_INC(BINARY_OP, hit);
-            int64_t sum;
-            if (__builtin_add_overflow(left_i, right_i, &sum)) {
-                JUMP_TO_LABEL(error);
+                STAT_INC(BINARY_OP, hit);
+                int64_t sum;
+                if (__builtin_add_overflow(left_i, right_i, &sum)) {
+                    JUMP_TO_LABEL(error);
+                }
+                PyObject *res_o = PyLong_FromInt64(sum);
+                if (res_o == NULL) {
+                    JUMP_TO_LABEL(error);
+                }
+                res = PyStackRef_FromPyObjectSteal(res_o);
+                l = left;
+                r = right;
+                INPUTS_DEAD();
             }
-            PyObject *res_o = PyLong_FromInt64(sum);
-            if (res_o == NULL) {
-                JUMP_TO_LABEL(error);
-            }
-            res = PyStackRef_FromPyObjectSteal(res_o);
-            l = left;
-            r = right;
-            INPUTS_DEAD();
         }
 
         pure op(_BINARY_OP_SUBTRACT_INT, (left, right -- res, l, r)) {
@@ -719,26 +721,28 @@ dummy_func(
                 r = right;
                 INPUTS_DEAD();
             }
-            int64_t left_i;
-            int64_t right_i;
-            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
-                EXIT_IF(true);
-            }
+            else {
+                int64_t left_i;
+                int64_t right_i;
+                if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
+                    !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
+                    EXIT_IF(true);
+                }
 
-            STAT_INC(BINARY_OP, hit);
-            int64_t diff;
-            if (__builtin_sub_overflow(left_i, right_i, &diff)) {
-                JUMP_TO_LABEL(error);
+                STAT_INC(BINARY_OP, hit);
+                int64_t diff;
+                if (__builtin_sub_overflow(left_i, right_i, &diff)) {
+                    JUMP_TO_LABEL(error);
+                }
+                PyObject *res_o = PyLong_FromInt64(diff);
+                if (res_o == NULL) {
+                    JUMP_TO_LABEL(error);
+                }
+                res = PyStackRef_FromPyObjectSteal(res_o);
+                l = left;
+                r = right;
+                INPUTS_DEAD();
             }
-            PyObject *res_o = PyLong_FromInt64(diff);
-            if (res_o == NULL) {
-                JUMP_TO_LABEL(error);
-            }
-            res = PyStackRef_FromPyObjectSteal(res_o);
-            l = left;
-            r = right;
-            INPUTS_DEAD();
         }
 
         macro(BINARY_OP_MULTIPLY_INT) =
