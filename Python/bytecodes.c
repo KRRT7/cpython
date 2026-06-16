@@ -674,6 +674,15 @@ dummy_func(
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
             assert(PyLong_CheckExact(left_o));
             assert(PyLong_CheckExact(right_o));
+            if (_PyLong_CheckExactAndCompact(left_o) &&
+                _PyLong_CheckExactAndCompact(right_o)) {
+                STAT_INC(BINARY_OP, hit);
+                res = _PyCompactLong_Add((PyLongObject *)left_o, (PyLongObject *)right_o);
+                EXIT_IF(PyStackRef_IsNull(res));
+                l = left;
+                r = right;
+                INPUTS_DEAD();
+            }
             int64_t left_i;
             int64_t right_i;
             if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
@@ -701,6 +710,15 @@ dummy_func(
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
             assert(PyLong_CheckExact(left_o));
             assert(PyLong_CheckExact(right_o));
+            if (_PyLong_CheckExactAndCompact(left_o) &&
+                _PyLong_CheckExactAndCompact(right_o)) {
+                STAT_INC(BINARY_OP, hit);
+                res = _PyCompactLong_Subtract((PyLongObject *)left_o, (PyLongObject *)right_o);
+                EXIT_IF(PyStackRef_IsNull(res));
+                l = left;
+                r = right;
+                INPUTS_DEAD();
+            }
             int64_t left_i;
             int64_t right_i;
             if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||

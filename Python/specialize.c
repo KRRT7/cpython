@@ -2349,6 +2349,10 @@ _Py_Specialize_BinaryOp(_PyStackRef lhs_st, _PyStackRef rhs_st, _Py_CODEUNIT *in
                 specialize(instr, BINARY_OP_ADD_UNICODE);
                 return;
             }
+            if (_PyLong_CheckExactAndCompact(lhs) && _PyLong_CheckExactAndCompact(rhs)) {
+                specialize(instr, BINARY_OP_ADD_INT);
+                return;
+            }
             if (_PyLong_CheckExactAndInt64(lhs, NULL) && _PyLong_CheckExactAndInt64(rhs, NULL)) {
                 specialize(instr, BINARY_OP_ADD_INT);
                 return;
@@ -2372,6 +2376,10 @@ _Py_Specialize_BinaryOp(_PyStackRef lhs_st, _PyStackRef rhs_st, _Py_CODEUNIT *in
         case NB_INPLACE_SUBTRACT:
             if (!Py_IS_TYPE(lhs, Py_TYPE(rhs))) {
                 break;
+            }
+            if (_PyLong_CheckExactAndCompact(lhs) && _PyLong_CheckExactAndCompact(rhs)) {
+                specialize(instr, BINARY_OP_SUBTRACT_INT);
+                return;
             }
             if (_PyLong_CheckExactAndInt64(lhs, NULL) && _PyLong_CheckExactAndInt64(rhs, NULL)) {
                 specialize(instr, BINARY_OP_SUBTRACT_INT);

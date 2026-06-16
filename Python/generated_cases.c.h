@@ -212,11 +212,24 @@
                 PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
                 assert(PyLong_CheckExact(left_o));
                 assert(PyLong_CheckExact(right_o));
+                if (_PyLong_CheckExactAndCompact(left_o) &&
+                    _PyLong_CheckExactAndCompact(right_o)) {
+                    STAT_INC(BINARY_OP, hit);
+                    res = _PyCompactLong_Add((PyLongObject *)left_o, (PyLongObject *)right_o);
+                    if (PyStackRef_IsNull(res)) {
+                        UPDATE_MISS_STATS(BINARY_OP);
+                        assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
+                        JUMP_TO_PREDICTED(BINARY_OP);
+                    }
+                    l = left;
+                    r = right;
+                    goto _BINARY_OP_ADD_INT_pop;
+                }
             int64_t left_i;
             int64_t right_i;
             if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
                 !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
-                UPDATE_MISS_STATS(BINARY_OP);
+                    UPDATE_MISS_STATS(BINARY_OP);
                 assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
                 JUMP_TO_PREDICTED(BINARY_OP);
             }
@@ -236,6 +249,7 @@
             r = right;
         }
             // _POP_TOP_INT
+            _BINARY_OP_ADD_INT_pop:
             {
                 value = r;
                 assert(PyLong_CheckExact(PyStackRef_AsPyObjectBorrow(value)));
@@ -1360,11 +1374,24 @@
                 PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
                 assert(PyLong_CheckExact(left_o));
                 assert(PyLong_CheckExact(right_o));
+                if (_PyLong_CheckExactAndCompact(left_o) &&
+                    _PyLong_CheckExactAndCompact(right_o)) {
+                    STAT_INC(BINARY_OP, hit);
+                    res = _PyCompactLong_Subtract((PyLongObject *)left_o, (PyLongObject *)right_o);
+                    if (PyStackRef_IsNull(res)) {
+                        UPDATE_MISS_STATS(BINARY_OP);
+                        assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
+                        JUMP_TO_PREDICTED(BINARY_OP);
+                    }
+                    l = left;
+                    r = right;
+                    goto _BINARY_OP_SUBTRACT_INT_pop;
+                }
             int64_t left_i;
             int64_t right_i;
             if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
                 !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
-                UPDATE_MISS_STATS(BINARY_OP);
+                    UPDATE_MISS_STATS(BINARY_OP);
                 assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
                 JUMP_TO_PREDICTED(BINARY_OP);
             }
@@ -1384,6 +1411,7 @@
             r = right;
         }
             // _POP_TOP_INT
+            _BINARY_OP_SUBTRACT_INT_pop:
             {
                 value = r;
                 assert(PyLong_CheckExact(PyStackRef_AsPyObjectBorrow(value)));
