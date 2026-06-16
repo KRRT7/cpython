@@ -616,7 +616,9 @@ dummy_func(
         family(BINARY_OP, INLINE_CACHE_ENTRIES_BINARY_OP) = {
             BINARY_OP_MULTIPLY_INT,
             BINARY_OP_ADD_INT,
+            BINARY_OP_ADD_INT64,
             BINARY_OP_SUBTRACT_INT,
+            BINARY_OP_SUBTRACT_INT64,
             BINARY_OP_MULTIPLY_FLOAT,
             BINARY_OP_ADD_FLOAT,
             BINARY_OP_SUBTRACT_FLOAT,
@@ -674,37 +676,36 @@ dummy_func(
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
             assert(PyLong_CheckExact(left_o));
             assert(PyLong_CheckExact(right_o));
-            if (_PyLong_CheckExactAndCompact(left_o) &&
-                _PyLong_CheckExactAndCompact(right_o)) {
-                STAT_INC(BINARY_OP, hit);
-                res = _PyCompactLong_Add((PyLongObject *)left_o, (PyLongObject *)right_o);
-                EXIT_IF(PyStackRef_IsNull(res));
-                l = left;
-                r = right;
-                INPUTS_DEAD();
-            }
-            else {
-                int64_t left_i;
-                int64_t right_i;
-                if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                    !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
-                    EXIT_IF(true);
-                }
+            assert(_PyLong_BothAreCompact((PyLongObject *)left_o, (PyLongObject *)right_o));
 
-                STAT_INC(BINARY_OP, hit);
-                int64_t sum;
-                if (__builtin_add_overflow(left_i, right_i, &sum)) {
-                    JUMP_TO_LABEL(error);
-                }
-                PyObject *res_o = PyLong_FromInt64(sum);
-                if (res_o == NULL) {
-                    JUMP_TO_LABEL(error);
-                }
-                res = PyStackRef_FromPyObjectSteal(res_o);
-                l = left;
-                r = right;
-                INPUTS_DEAD();
+            STAT_INC(BINARY_OP, hit);
+            res = _PyCompactLong_Add((PyLongObject *)left_o, (PyLongObject *)right_o);
+            EXIT_IF(PyStackRef_IsNull(res));
+            l = left;
+            r = right;
+            INPUTS_DEAD();
+        }
+
+        op(_BINARY_OP_ADD_INT64, (left, right -- res)) {
+            PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
+            PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
+            int64_t left_i;
+            int64_t right_i;
+            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
+                !_PyLong_CheckExactAndInt64(right_o, &right_i) ||
+                (_PyLong_CheckExactAndCompact(left_o) &&
+                 _PyLong_CheckExactAndCompact(right_o))) {
+                EXIT_IF(true);
             }
+
+            STAT_INC(BINARY_OP, hit);
+            int64_t sum;
+            int overflow = __builtin_add_overflow(left_i, right_i, &sum);
+            EXIT_IF(overflow);
+            PyObject *res_o = PyLong_FromInt64(sum);
+            DECREF_INPUTS();
+            ERROR_IF(res_o == NULL);
+            res = PyStackRef_FromPyObjectSteal(res_o);
         }
 
         pure op(_BINARY_OP_SUBTRACT_INT, (left, right -- res, l, r)) {
@@ -712,37 +713,36 @@ dummy_func(
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
             assert(PyLong_CheckExact(left_o));
             assert(PyLong_CheckExact(right_o));
-            if (_PyLong_CheckExactAndCompact(left_o) &&
-                _PyLong_CheckExactAndCompact(right_o)) {
-                STAT_INC(BINARY_OP, hit);
-                res = _PyCompactLong_Subtract((PyLongObject *)left_o, (PyLongObject *)right_o);
-                EXIT_IF(PyStackRef_IsNull(res));
-                l = left;
-                r = right;
-                INPUTS_DEAD();
-            }
-            else {
-                int64_t left_i;
-                int64_t right_i;
-                if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                    !_PyLong_CheckExactAndInt64(right_o, &right_i)) {
-                    EXIT_IF(true);
-                }
+            assert(_PyLong_BothAreCompact((PyLongObject *)left_o, (PyLongObject *)right_o));
 
-                STAT_INC(BINARY_OP, hit);
-                int64_t diff;
-                if (__builtin_sub_overflow(left_i, right_i, &diff)) {
-                    JUMP_TO_LABEL(error);
-                }
-                PyObject *res_o = PyLong_FromInt64(diff);
-                if (res_o == NULL) {
-                    JUMP_TO_LABEL(error);
-                }
-                res = PyStackRef_FromPyObjectSteal(res_o);
-                l = left;
-                r = right;
-                INPUTS_DEAD();
+            STAT_INC(BINARY_OP, hit);
+            res = _PyCompactLong_Subtract((PyLongObject *)left_o, (PyLongObject *)right_o);
+            EXIT_IF(PyStackRef_IsNull(res));
+            l = left;
+            r = right;
+            INPUTS_DEAD();
+        }
+
+        op(_BINARY_OP_SUBTRACT_INT64, (left, right -- res)) {
+            PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
+            PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
+            int64_t left_i;
+            int64_t right_i;
+            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
+                !_PyLong_CheckExactAndInt64(right_o, &right_i) ||
+                (_PyLong_CheckExactAndCompact(left_o) &&
+                 _PyLong_CheckExactAndCompact(right_o))) {
+                EXIT_IF(true);
             }
+
+            STAT_INC(BINARY_OP, hit);
+            int64_t diff;
+            int overflow = __builtin_sub_overflow(left_i, right_i, &diff);
+            EXIT_IF(overflow);
+            PyObject *res_o = PyLong_FromInt64(diff);
+            DECREF_INPUTS();
+            ERROR_IF(res_o == NULL);
+            res = PyStackRef_FromPyObjectSteal(res_o);
         }
 
         macro(BINARY_OP_MULTIPLY_INT) =
@@ -751,8 +751,14 @@ dummy_func(
         macro(BINARY_OP_ADD_INT) =
             _GUARD_TOS_INT + _GUARD_NOS_INT + unused/5 + _BINARY_OP_ADD_INT + _POP_TOP_INT + _POP_TOP_INT;
 
+        macro(BINARY_OP_ADD_INT64) =
+            unused/5 + _BINARY_OP_ADD_INT64;
+
         macro(BINARY_OP_SUBTRACT_INT) =
             _GUARD_TOS_INT + _GUARD_NOS_INT + unused/5 + _BINARY_OP_SUBTRACT_INT + _POP_TOP_INT + _POP_TOP_INT;
+
+        macro(BINARY_OP_SUBTRACT_INT64) =
+            unused/5 + _BINARY_OP_SUBTRACT_INT64;
 
         // Inplace compact int ops: mutate the uniquely-referenced operand
         // when possible. The op handles decref of TARGET internally so

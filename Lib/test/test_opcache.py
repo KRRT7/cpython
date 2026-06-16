@@ -1389,7 +1389,7 @@ class TestSpecializer(TestBase):
             self.assertEqual(a + b, _INT64_MAX + 1)
 
         binary_op_add_int64_boundary()
-        self.assert_specialized(binary_op_add_int64_boundary, "BINARY_OP_ADD_INT")
+        self.assert_specialized(binary_op_add_int64_boundary, "BINARY_OP_ADD_INT64")
 
         def binary_op_subtract_int64_boundary():
             a = _INT64_MIN
@@ -1400,7 +1400,7 @@ class TestSpecializer(TestBase):
 
         binary_op_subtract_int64_boundary()
         self.assert_specialized(
-            binary_op_subtract_int64_boundary, "BINARY_OP_SUBTRACT_INT"
+            binary_op_subtract_int64_boundary, "BINARY_OP_SUBTRACT_INT64"
         )
 
         def binary_op_int_non_compact():
