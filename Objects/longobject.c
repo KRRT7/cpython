@@ -3834,14 +3834,10 @@ static PyLongObject *
 long_add_same_sign_two_digit_int64(PyLongObject *a, PyLongObject *b)
 {
     assert(_PyLong_IsNegative(a) == _PyLong_IsNegative(b));
-    if (!PyLong_CheckExact((PyObject *)a) ||
-        !PyLong_CheckExact((PyObject *)b))
-    {
-        return NULL;
-    }
-    if (_PyLong_DigitCount(a) != 2 || _PyLong_DigitCount(b) != 2) {
-        return NULL;
-    }
+    assert(PyLong_CheckExact((PyObject *)a));
+    assert(PyLong_CheckExact((PyObject *)b));
+    assert(_PyLong_DigitCount(a) == 2);
+    assert(_PyLong_DigitCount(b) == 2);
 
     int64_t left = ((int64_t)a->long_value.ob_digit[1] << PyLong_SHIFT) |
                    a->long_value.ob_digit[0];
@@ -3865,9 +3861,11 @@ long_add(PyLongObject *a, PyLongObject *b)
     PyLongObject *z;
     if (_PyLong_IsNegative(a)) {
         if (_PyLong_IsNegative(b)) {
-            z = long_add_same_sign_two_digit_int64(a, b);
-            if (z != NULL || PyErr_Occurred()) {
-                return z;
+            if (_PyLong_DigitCount(a) == 2 && _PyLong_DigitCount(b) == 2 &&
+                PyLong_CheckExact((PyObject *)a) &&
+                PyLong_CheckExact((PyObject *)b))
+            {
+                return long_add_same_sign_two_digit_int64(a, b);
             }
             z = x_add(a, b);
             if (z != NULL) {
@@ -3886,9 +3884,11 @@ long_add(PyLongObject *a, PyLongObject *b)
         if (_PyLong_IsNegative(b))
             z = x_sub(a, b);
         else {
-            z = long_add_same_sign_two_digit_int64(a, b);
-            if (z != NULL || PyErr_Occurred()) {
-                return z;
+            if (_PyLong_DigitCount(a) == 2 && _PyLong_DigitCount(b) == 2 &&
+                PyLong_CheckExact((PyObject *)a) &&
+                PyLong_CheckExact((PyObject *)b))
+            {
+                return long_add_same_sign_two_digit_int64(a, b);
             }
             z = x_add(a, b);
         }
