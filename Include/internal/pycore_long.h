@@ -358,6 +358,13 @@ _PyLong_CheckExactAndInt64(PyObject *op, int64_t *out)
     if (ndigits > max_digits) {
         return 0;
     }
+    if (ndigits == max_digits) {
+        int top_bits = 64 - (int)((max_digits - 1) * PyLong_SHIFT);
+        digit top_digit = v->long_value.ob_digit[ndigits - 1];
+        if ((top_digit >> top_bits) != 0) {
+            return 0;
+        }
+    }
     uint64_t value = 0;
     for (Py_ssize_t i = ndigits; i-- > 0;) {
         value = (value << PyLong_SHIFT) | v->long_value.ob_digit[i];
