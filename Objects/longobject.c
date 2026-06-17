@@ -3830,7 +3830,7 @@ x_sub(PyLongObject *a, PyLongObject *b)
     return maybe_small_long(long_normalize(z));
 }
 
-static PyLongObject *
+Py_NO_INLINE static PyLongObject *
 long_add_same_sign_two_digit_int64(PyLongObject *a, PyLongObject *b)
 {
     assert(_PyLong_IsNegative(a) == _PyLong_IsNegative(b));
