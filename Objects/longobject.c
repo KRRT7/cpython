@@ -3757,13 +3757,6 @@ x_add(PyLongObject *a, PyLongObject *b)
             size_a = size_b;
             size_b = size_temp; }
     }
-    if (size_a == 2 && size_b == 2) {
-        int64_t left = ((int64_t)a->long_value.ob_digit[1] << PyLong_SHIFT) |
-                       a->long_value.ob_digit[0];
-        int64_t right = ((int64_t)b->long_value.ob_digit[1] << PyLong_SHIFT) |
-                        b->long_value.ob_digit[0];
-        return (PyLongObject *)PyLong_FromInt64(left + right);
-    }
     z = long_alloc(size_a+1);
     if (z == NULL)
         return NULL;
