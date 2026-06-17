@@ -618,7 +618,6 @@ dummy_func(
             BINARY_OP_ADD_INT,
             BINARY_OP_ADD_INT64,
             BINARY_OP_SUBTRACT_INT,
-            BINARY_OP_SUBTRACT_INT64,
             BINARY_OP_MULTIPLY_FLOAT,
             BINARY_OP_ADD_FLOAT,
             BINARY_OP_SUBTRACT_FLOAT,
@@ -714,19 +713,6 @@ dummy_func(
             INPUTS_DEAD();
         }
 
-        op(_BINARY_OP_SUBTRACT_INT64, (left, right -- res)) {
-            PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
-            PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
-
-            PyObject *res_o;
-            int result = _PyLong_SubtractInt64(left_o, right_o, &res_o);
-            EXIT_IF(result == 0);
-            STAT_INC(BINARY_OP, hit);
-            DECREF_INPUTS();
-            ERROR_IF(result < 0);
-            res = PyStackRef_FromPyObjectSteal(res_o);
-        }
-
         macro(BINARY_OP_MULTIPLY_INT) =
             _GUARD_TOS_INT + _GUARD_NOS_INT + unused/5 + _BINARY_OP_MULTIPLY_INT + _POP_TOP_INT + _POP_TOP_INT;
 
@@ -738,9 +724,6 @@ dummy_func(
 
         macro(BINARY_OP_SUBTRACT_INT) =
             _GUARD_TOS_INT + _GUARD_NOS_INT + unused/5 + _BINARY_OP_SUBTRACT_INT + _POP_TOP_INT + _POP_TOP_INT;
-
-        macro(BINARY_OP_SUBTRACT_INT64) =
-            unused/5 + _BINARY_OP_SUBTRACT_INT64;
 
         // Inplace compact int ops: mutate the uniquely-referenced operand
         // when possible. The op handles decref of TARGET internally so

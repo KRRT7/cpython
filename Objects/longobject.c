@@ -3943,33 +3943,6 @@ _PyCompactLong_Subtract(PyLongObject *a, PyLongObject *b)
     return medium_from_stwodigits(v);
 }
 
-int
-_PyLong_SubtractInt64(PyObject *left, PyObject *right, PyObject **result)
-{
-    assert(result != NULL);
-    *result = NULL;
-
-    if (_PyLong_CheckExactAndCompact(left) &&
-        _PyLong_CheckExactAndCompact(right)) {
-        return 0;
-    }
-
-    int64_t left_i;
-    int64_t right_i;
-    if (!_PyLong_CheckExactAndInt64(left, &left_i) ||
-        !_PyLong_CheckExactAndInt64(right, &right_i)) {
-        return 0;
-    }
-
-    int64_t diff;
-    if (__builtin_sub_overflow(left_i, right_i, &diff)) {
-        return 0;
-    }
-
-    *result = PyLong_FromInt64(diff);
-    return *result != NULL ? 1 : -1;
-}
-
 static PyObject *
 long_sub_method(PyObject *a, PyObject *b)
 {
