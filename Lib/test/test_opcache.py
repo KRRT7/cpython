@@ -6,9 +6,7 @@ import sys
 import threading
 import types
 import unittest
-from test import support
 from test.support import (threading_helper, check_impl_detail,
-                          script_helper,
                           requires_specialization,
                           cpython_only, requires_jit_disabled, reset_code)
 from test.support.import_helper import import_module
@@ -2212,7 +2210,6 @@ class TestSpecializer(TestBase):
 
         module.__dict__["__getattr__"] = module_getattr
 
-        import sys
         sys.modules.pop("test_module_with_getattr", None)
         sys.modules["test_module_with_getattr"] = module
         try:
