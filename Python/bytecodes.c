@@ -616,6 +616,7 @@ dummy_func(
         family(BINARY_OP, INLINE_CACHE_ENTRIES_BINARY_OP) = {
             BINARY_OP_MULTIPLY_INT,
             BINARY_OP_ADD_INT,
+            BINARY_OP_ADD_INT64,
             BINARY_OP_SUBTRACT_INT,
             BINARY_OP_MULTIPLY_FLOAT,
             BINARY_OP_ADD_FLOAT,
@@ -6689,6 +6690,37 @@ dummy_func(
             Py_FatalError("JIT label executed in non-jit build.");
 #endif
         }
+
+        op(_BINARY_OP_ADD_INT64, (left, right -- res)) {
+            PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
+            PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
+            EXIT_IF(!PyLong_CheckExact(left_o));
+            EXIT_IF(!PyLong_CheckExact(right_o));
+
+            PyLongObject *left_long = (PyLongObject *)left_o;
+            PyLongObject *right_long = (PyLongObject *)right_o;
+            EXIT_IF(_PyLong_DigitCount(left_long) != 2);
+            EXIT_IF(_PyLong_DigitCount(right_long) != 2);
+            EXIT_IF(_PyLong_IsNegative(left_long) != _PyLong_IsNegative(right_long));
+
+            int64_t left_abs = ((int64_t)left_long->long_value.ob_digit[1] << PyLong_SHIFT) |
+                               left_long->long_value.ob_digit[0];
+            int64_t right_abs = ((int64_t)right_long->long_value.ob_digit[1] << PyLong_SHIFT) |
+                                right_long->long_value.ob_digit[0];
+            int64_t sum = left_abs + right_abs;
+            if (_PyLong_IsNegative(left_long)) {
+                sum = -sum;
+            }
+
+            STAT_INC(BINARY_OP, hit);
+            PyObject *res_o = PyLong_FromInt64(sum);
+            DECREF_INPUTS();
+            ERROR_IF(res_o == NULL);
+            res = PyStackRef_FromPyObjectSteal(res_o);
+        }
+
+        macro(BINARY_OP_ADD_INT64) =
+            unused/5 + _BINARY_OP_ADD_INT64;
 
 
 // END BYTECODES //

@@ -44,6 +44,8 @@ int _PyOpcode_num_popped(int opcode, int oparg)  {
             return 2;
         case BINARY_OP_ADD_INT:
             return 2;
+        case BINARY_OP_ADD_INT64:
+            return 2;
         case BINARY_OP_ADD_UNICODE:
             return 2;
         case BINARY_OP_EXTEND:
@@ -544,6 +546,8 @@ int _PyOpcode_num_pushed(int opcode, int oparg)  {
         case BINARY_OP_ADD_FLOAT:
             return 1;
         case BINARY_OP_ADD_INT:
+            return 1;
+        case BINARY_OP_ADD_INT64:
             return 1;
         case BINARY_OP_ADD_UNICODE:
             return 1;
@@ -1115,6 +1119,7 @@ const struct opcode_metadata _PyOpcode_opcode_metadata[267] = {
     [BINARY_OP] = { true, INSTR_FMT_IBC0000, HAS_ARG_FLAG | HAS_ERROR_FLAG | HAS_ERROR_NO_POP_FLAG | HAS_ESCAPES_FLAG | HAS_RECORDS_VALUE_FLAG },
     [BINARY_OP_ADD_FLOAT] = { true, INSTR_FMT_IXC0000, HAS_EXIT_FLAG | HAS_ERROR_FLAG | HAS_ERROR_NO_POP_FLAG },
     [BINARY_OP_ADD_INT] = { true, INSTR_FMT_IXC0000, HAS_EXIT_FLAG },
+    [BINARY_OP_ADD_INT64] = { true, INSTR_FMT_IXC0000, HAS_EXIT_FLAG | HAS_ERROR_FLAG | HAS_ESCAPES_FLAG },
     [BINARY_OP_ADD_UNICODE] = { true, INSTR_FMT_IXC0000, HAS_EXIT_FLAG | HAS_ERROR_FLAG | HAS_ERROR_NO_POP_FLAG },
     [BINARY_OP_EXTEND] = { true, INSTR_FMT_IXC0000, HAS_EXIT_FLAG | HAS_ERROR_FLAG | HAS_ERROR_NO_POP_FLAG | HAS_ESCAPES_FLAG },
     [BINARY_OP_INPLACE_ADD_UNICODE] = { true, INSTR_FMT_IXC0000, HAS_LOCAL_FLAG | HAS_EXIT_FLAG | HAS_ERROR_FLAG | HAS_ESCAPES_FLAG },
@@ -1373,6 +1378,7 @@ _PyOpcode_macro_expansion[256] = {
     [BINARY_OP] = { .nuops = 5, .uops = { { _RECORD_TOS_TYPE, OPARG_SIMPLE, 0 }, { _RECORD_NOS_TYPE, OPARG_SIMPLE, 0 }, { _BINARY_OP, OPARG_SIMPLE, 4 }, { _POP_TOP, OPARG_SIMPLE, 4 }, { _POP_TOP, OPARG_SIMPLE, 4 } } },
     [BINARY_OP_ADD_FLOAT] = { .nuops = 5, .uops = { { _GUARD_TOS_FLOAT, OPARG_SIMPLE, 0 }, { _GUARD_NOS_FLOAT, OPARG_SIMPLE, 0 }, { _BINARY_OP_ADD_FLOAT, OPARG_SIMPLE, 5 }, { _POP_TOP_FLOAT, OPARG_SIMPLE, 5 }, { _POP_TOP_FLOAT, OPARG_SIMPLE, 5 } } },
     [BINARY_OP_ADD_INT] = { .nuops = 5, .uops = { { _GUARD_TOS_INT, OPARG_SIMPLE, 0 }, { _GUARD_NOS_INT, OPARG_SIMPLE, 0 }, { _BINARY_OP_ADD_INT, OPARG_SIMPLE, 5 }, { _POP_TOP_INT, OPARG_SIMPLE, 5 }, { _POP_TOP_INT, OPARG_SIMPLE, 5 } } },
+    [BINARY_OP_ADD_INT64] = { .nuops = 1, .uops = { { _BINARY_OP_ADD_INT64, OPARG_SIMPLE, 5 } } },
     [BINARY_OP_ADD_UNICODE] = { .nuops = 5, .uops = { { _GUARD_TOS_UNICODE, OPARG_SIMPLE, 0 }, { _GUARD_NOS_UNICODE, OPARG_SIMPLE, 0 }, { _BINARY_OP_ADD_UNICODE, OPARG_SIMPLE, 5 }, { _POP_TOP_UNICODE, OPARG_SIMPLE, 5 }, { _POP_TOP_UNICODE, OPARG_SIMPLE, 5 } } },
     [BINARY_OP_EXTEND] = { .nuops = 4, .uops = { { _GUARD_BINARY_OP_EXTEND, 4, 1 }, { _BINARY_OP_EXTEND, 4, 1 }, { _POP_TOP, OPARG_SIMPLE, 5 }, { _POP_TOP, OPARG_SIMPLE, 5 } } },
     [BINARY_OP_INPLACE_ADD_UNICODE] = { .nuops = 3, .uops = { { _GUARD_TOS_UNICODE, OPARG_SIMPLE, 0 }, { _GUARD_NOS_UNICODE, OPARG_SIMPLE, 0 }, { _BINARY_OP_INPLACE_ADD_UNICODE, OPARG_SIMPLE, 5 } } },
@@ -1573,6 +1579,7 @@ const char *_PyOpcode_OpName[267] = {
     [BINARY_OP] = "BINARY_OP",
     [BINARY_OP_ADD_FLOAT] = "BINARY_OP_ADD_FLOAT",
     [BINARY_OP_ADD_INT] = "BINARY_OP_ADD_INT",
+    [BINARY_OP_ADD_INT64] = "BINARY_OP_ADD_INT64",
     [BINARY_OP_ADD_UNICODE] = "BINARY_OP_ADD_UNICODE",
     [BINARY_OP_EXTEND] = "BINARY_OP_EXTEND",
     [BINARY_OP_INPLACE_ADD_UNICODE] = "BINARY_OP_INPLACE_ADD_UNICODE",
@@ -1856,7 +1863,6 @@ const uint8_t _PyOpcode_Deopt[256] = {
     [125] = 125,
     [126] = 126,
     [127] = 127,
-    [219] = 219,
     [220] = 220,
     [221] = 221,
     [222] = 222,
@@ -1873,6 +1879,7 @@ const uint8_t _PyOpcode_Deopt[256] = {
     [BINARY_OP] = BINARY_OP,
     [BINARY_OP_ADD_FLOAT] = BINARY_OP,
     [BINARY_OP_ADD_INT] = BINARY_OP,
+    [BINARY_OP_ADD_INT64] = BINARY_OP,
     [BINARY_OP_ADD_UNICODE] = BINARY_OP,
     [BINARY_OP_EXTEND] = BINARY_OP,
     [BINARY_OP_INPLACE_ADD_UNICODE] = BINARY_OP,
@@ -2117,7 +2124,6 @@ const uint8_t _PyOpcode_Deopt[256] = {
     case 125: \
     case 126: \
     case 127: \
-    case 219: \
     case 220: \
     case 221: \
     case 222: \

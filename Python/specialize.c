@@ -2319,6 +2319,20 @@ binary_op_extended_specialization(PyObject *lhs, PyObject *rhs, int oparg,
     return 0;
 }
 
+static bool
+two_digit_same_sign_long(PyObject *lhs, PyObject *rhs)
+{
+    if (!PyLong_CheckExact(lhs) || !PyLong_CheckExact(rhs)) {
+        return false;
+    }
+
+    PyLongObject *lhs_long = (PyLongObject *)lhs;
+    PyLongObject *rhs_long = (PyLongObject *)rhs;
+    return _PyLong_DigitCount(lhs_long) == 2 &&
+           _PyLong_DigitCount(rhs_long) == 2 &&
+           _PyLong_IsNegative(lhs_long) == _PyLong_IsNegative(rhs_long);
+}
+
 Py_NO_INLINE void
 _Py_Specialize_BinaryOp(_PyStackRef lhs_st, _PyStackRef rhs_st, _Py_CODEUNIT *instr,
                         int oparg, _PyStackRef *locals)
@@ -2351,6 +2365,10 @@ _Py_Specialize_BinaryOp(_PyStackRef lhs_st, _PyStackRef rhs_st, _Py_CODEUNIT *in
             }
             if (_PyLong_CheckExactAndCompact(lhs) && _PyLong_CheckExactAndCompact(rhs)) {
                 specialize(instr, BINARY_OP_ADD_INT);
+                return;
+            }
+            if (two_digit_same_sign_long(lhs, rhs)) {
+                specialize(instr, BINARY_OP_ADD_INT64);
                 return;
             }
             if (PyFloat_CheckExact(lhs)) {

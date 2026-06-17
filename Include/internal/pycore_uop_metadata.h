@@ -433,6 +433,7 @@ const uint32_t _PyUop_Flags[MAX_UOP_ID+1] = {
     [_RECORD_CALLABLE_KW] = HAS_ARG_FLAG | HAS_RECORDS_VALUE_FLAG,
     [_RECORD_BOUND_METHOD] = HAS_ARG_FLAG | HAS_RECORDS_VALUE_FLAG,
     [_RECORD_CODE] = HAS_RECORDS_VALUE_FLAG,
+    [_BINARY_OP_ADD_INT64] = HAS_EXIT_FLAG | HAS_ERROR_FLAG | HAS_ESCAPES_FLAG,
 };
 
 const ReplicationRange _PyUop_Replication[MAX_UOP_ID+1] = {
@@ -3922,6 +3923,15 @@ const _PyUopCachingInfo _PyUop_Caching[MAX_UOP_ID+1] = {
             { 3, 3, _GUARD_IP_RETURN_GENERATOR_r33 },
         },
     },
+    [_BINARY_OP_ADD_INT64] = {
+        .best = { 2, 2, 2, 2 },
+        .entries = {
+            { -1, -1, -1 },
+            { -1, -1, -1 },
+            { 1, 2, _BINARY_OP_ADD_INT64_r21 },
+            { -1, -1, -1 },
+        },
+    },
 };
 
 const uint16_t _PyUop_Uncached[MAX_UOP_REGS_ID+1] = {
@@ -4855,6 +4865,7 @@ const uint16_t _PyUop_Uncached[MAX_UOP_REGS_ID+1] = {
     [_GUARD_IP_RETURN_GENERATOR_r11] = _GUARD_IP_RETURN_GENERATOR,
     [_GUARD_IP_RETURN_GENERATOR_r22] = _GUARD_IP_RETURN_GENERATOR,
     [_GUARD_IP_RETURN_GENERATOR_r33] = _GUARD_IP_RETURN_GENERATOR,
+    [_BINARY_OP_ADD_INT64_r21] = _BINARY_OP_ADD_INT64,
 };
 
 const uint16_t _PyUop_SpillsAndReloads[4][4] = {
@@ -4893,6 +4904,8 @@ const char *const _PyOpcode_uop_name[MAX_UOP_REGS_ID+1] = {
     [_BINARY_OP_ADD_INT_r03] = "_BINARY_OP_ADD_INT_r03",
     [_BINARY_OP_ADD_INT_r13] = "_BINARY_OP_ADD_INT_r13",
     [_BINARY_OP_ADD_INT_r23] = "_BINARY_OP_ADD_INT_r23",
+    [_BINARY_OP_ADD_INT64] = "_BINARY_OP_ADD_INT64",
+    [_BINARY_OP_ADD_INT64_r21] = "_BINARY_OP_ADD_INT64_r21",
     [_BINARY_OP_ADD_INT_INPLACE] = "_BINARY_OP_ADD_INT_INPLACE",
     [_BINARY_OP_ADD_INT_INPLACE_r03] = "_BINARY_OP_ADD_INT_INPLACE_r03",
     [_BINARY_OP_ADD_INT_INPLACE_r13] = "_BINARY_OP_ADD_INT_INPLACE_r13",
@@ -7001,6 +7014,8 @@ int _PyUop_num_popped(int opcode, int oparg)
             return 0;
         case _RECORD_CODE:
             return 0;
+        case _BINARY_OP_ADD_INT64:
+            return 2;
         default:
             return -1;
     }
