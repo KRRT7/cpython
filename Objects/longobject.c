@@ -3831,23 +3831,20 @@ x_sub(PyLongObject *a, PyLongObject *b)
 }
 
 Py_NO_INLINE static PyLongObject *
-long_add_same_sign_two_digit_int64(PyLongObject *a, PyLongObject *b)
+long_add_positive_two_digit(PyLongObject *a, PyLongObject *b)
 {
-    assert(_PyLong_IsNegative(a) == _PyLong_IsNegative(b));
+    assert(!_PyLong_IsNegative(a));
+    assert(!_PyLong_IsNegative(b));
     assert(PyLong_CheckExact((PyObject *)a));
     assert(PyLong_CheckExact((PyObject *)b));
     assert(_PyLong_DigitCount(a) == 2);
     assert(_PyLong_DigitCount(b) == 2);
 
-    int64_t left = ((int64_t)a->long_value.ob_digit[1] << PyLong_SHIFT) |
-                   a->long_value.ob_digit[0];
-    int64_t right = ((int64_t)b->long_value.ob_digit[1] << PyLong_SHIFT) |
-                    b->long_value.ob_digit[0];
-    int64_t sum = left + right;
-    if (_PyLong_IsNegative(a)) {
-        sum = -sum;
-    }
-    return (PyLongObject *)PyLong_FromInt64(sum);
+    stwodigits left = ((stwodigits)a->long_value.ob_digit[1] << PyLong_SHIFT) |
+                      a->long_value.ob_digit[0];
+    stwodigits right = ((stwodigits)b->long_value.ob_digit[1] << PyLong_SHIFT) |
+                       b->long_value.ob_digit[0];
+    return _PyLong_FromSTwoDigits(left + right);
 }
 
 static PyLongObject *
@@ -3861,12 +3858,6 @@ long_add(PyLongObject *a, PyLongObject *b)
     PyLongObject *z;
     if (_PyLong_IsNegative(a)) {
         if (_PyLong_IsNegative(b)) {
-            if (_PyLong_DigitCount(a) == 2 && _PyLong_DigitCount(b) == 2 &&
-                PyLong_CheckExact((PyObject *)a) &&
-                PyLong_CheckExact((PyObject *)b))
-            {
-                return long_add_same_sign_two_digit_int64(a, b);
-            }
             z = x_add(a, b);
             if (z != NULL) {
                 /* x_add received at least one multiple-digit int,
@@ -3888,7 +3879,7 @@ long_add(PyLongObject *a, PyLongObject *b)
                 PyLong_CheckExact((PyObject *)a) &&
                 PyLong_CheckExact((PyObject *)b))
             {
-                return long_add_same_sign_two_digit_int64(a, b);
+                return long_add_positive_two_digit(a, b);
             }
             z = x_add(a, b);
         }
