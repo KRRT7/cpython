@@ -260,30 +260,17 @@
             left = stack_pointer[-2];
             PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
-            int64_t left_i;
-            int64_t right_i;
-            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                !_PyLong_CheckExactAndInt64(right_o, &right_i) ||
-                (_PyLong_CheckExactAndCompact(left_o) &&
-                 _PyLong_CheckExactAndCompact(right_o))) {
-                if (true) {
-                    UPDATE_MISS_STATS(BINARY_OP);
-                    assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
-                    JUMP_TO_PREDICTED(BINARY_OP);
-                }
-            }
-            STAT_INC(BINARY_OP, hit);
-            int64_t sum;
+            PyObject *res_o;
             _PyFrame_SetStackPointer(frame, stack_pointer);
-            int overflow = __builtin_add_overflow(left_i, right_i, &sum);
+            int result = _PyLong_AddInt64(left_o, right_o, &res_o);
             stack_pointer = _PyFrame_GetStackPointer(frame);
-            if (overflow) {
+            if (result == 0) {
                 UPDATE_MISS_STATS(BINARY_OP);
                 assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
                 JUMP_TO_PREDICTED(BINARY_OP);
             }
+            STAT_INC(BINARY_OP, hit);
             _PyFrame_SetStackPointer(frame, stack_pointer);
-            PyObject *res_o = PyLong_FromInt64(sum);
             _PyStackRef tmp = right;
             right = PyStackRef_NULL;
             stack_pointer[-1] = right;
@@ -295,7 +282,7 @@
             stack_pointer = _PyFrame_GetStackPointer(frame);
             stack_pointer += -2;
             ASSERT_WITHIN_STACK_BOUNDS(__FILE__, __LINE__);
-            if (res_o == NULL) {
+            if (result < 0) {
                 JUMP_TO_LABEL(error);
             }
             res = PyStackRef_FromPyObjectSteal(res_o);
@@ -1460,30 +1447,17 @@
             left = stack_pointer[-2];
             PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
-            int64_t left_i;
-            int64_t right_i;
-            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                !_PyLong_CheckExactAndInt64(right_o, &right_i) ||
-                (_PyLong_CheckExactAndCompact(left_o) &&
-                 _PyLong_CheckExactAndCompact(right_o))) {
-                if (true) {
-                    UPDATE_MISS_STATS(BINARY_OP);
-                    assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
-                    JUMP_TO_PREDICTED(BINARY_OP);
-                }
-            }
-            STAT_INC(BINARY_OP, hit);
-            int64_t diff;
+            PyObject *res_o;
             _PyFrame_SetStackPointer(frame, stack_pointer);
-            int overflow = __builtin_sub_overflow(left_i, right_i, &diff);
+            int result = _PyLong_SubtractInt64(left_o, right_o, &res_o);
             stack_pointer = _PyFrame_GetStackPointer(frame);
-            if (overflow) {
+            if (result == 0) {
                 UPDATE_MISS_STATS(BINARY_OP);
                 assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
                 JUMP_TO_PREDICTED(BINARY_OP);
             }
+            STAT_INC(BINARY_OP, hit);
             _PyFrame_SetStackPointer(frame, stack_pointer);
-            PyObject *res_o = PyLong_FromInt64(diff);
             _PyStackRef tmp = right;
             right = PyStackRef_NULL;
             stack_pointer[-1] = right;
@@ -1495,7 +1469,7 @@
             stack_pointer = _PyFrame_GetStackPointer(frame);
             stack_pointer += -2;
             ASSERT_WITHIN_STACK_BOUNDS(__FILE__, __LINE__);
-            if (res_o == NULL) {
+            if (result < 0) {
                 JUMP_TO_LABEL(error);
             }
             res = PyStackRef_FromPyObjectSteal(res_o);

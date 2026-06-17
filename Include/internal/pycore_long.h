@@ -116,6 +116,8 @@ PyAPI_DATA(PyObject*) _PyLong_Lshift(PyObject *, int64_t);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Add(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Multiply(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Subtract(PyLongObject *left, PyLongObject *right);
+PyAPI_FUNC(int) _PyLong_AddInt64(PyObject *left, PyObject *right, PyObject **result);
+PyAPI_FUNC(int) _PyLong_SubtractInt64(PyObject *left, PyObject *right, PyObject **result);
 
 // Export for 'binascii' shared extension.
 PyAPI_DATA(unsigned char) _PyLong_DigitValue[256];

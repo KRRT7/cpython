@@ -689,22 +689,13 @@ dummy_func(
         op(_BINARY_OP_ADD_INT64, (left, right -- res)) {
             PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
-            int64_t left_i;
-            int64_t right_i;
-            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                !_PyLong_CheckExactAndInt64(right_o, &right_i) ||
-                (_PyLong_CheckExactAndCompact(left_o) &&
-                 _PyLong_CheckExactAndCompact(right_o))) {
-                EXIT_IF(true);
-            }
 
+            PyObject *res_o;
+            int result = _PyLong_AddInt64(left_o, right_o, &res_o);
+            EXIT_IF(result == 0);
             STAT_INC(BINARY_OP, hit);
-            int64_t sum;
-            int overflow = __builtin_add_overflow(left_i, right_i, &sum);
-            EXIT_IF(overflow);
-            PyObject *res_o = PyLong_FromInt64(sum);
             DECREF_INPUTS();
-            ERROR_IF(res_o == NULL);
+            ERROR_IF(result < 0);
             res = PyStackRef_FromPyObjectSteal(res_o);
         }
 
@@ -726,22 +717,13 @@ dummy_func(
         op(_BINARY_OP_SUBTRACT_INT64, (left, right -- res)) {
             PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
             PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
-            int64_t left_i;
-            int64_t right_i;
-            if (!_PyLong_CheckExactAndInt64(left_o, &left_i) ||
-                !_PyLong_CheckExactAndInt64(right_o, &right_i) ||
-                (_PyLong_CheckExactAndCompact(left_o) &&
-                 _PyLong_CheckExactAndCompact(right_o))) {
-                EXIT_IF(true);
-            }
 
+            PyObject *res_o;
+            int result = _PyLong_SubtractInt64(left_o, right_o, &res_o);
+            EXIT_IF(result == 0);
             STAT_INC(BINARY_OP, hit);
-            int64_t diff;
-            int overflow = __builtin_sub_overflow(left_i, right_i, &diff);
-            EXIT_IF(overflow);
-            PyObject *res_o = PyLong_FromInt64(diff);
             DECREF_INPUTS();
-            ERROR_IF(res_o == NULL);
+            ERROR_IF(result < 0);
             res = PyStackRef_FromPyObjectSteal(res_o);
         }
 
