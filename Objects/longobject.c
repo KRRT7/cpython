@@ -3857,8 +3857,32 @@ long_add(PyLongObject *a, PyLongObject *b)
     else {
         if (_PyLong_IsNegative(b))
             z = x_sub(a, b);
-        else
+        else {
+            if (PyLong_CheckExact((PyObject *)a) &&
+                PyLong_CheckExact((PyObject *)b))
+            {
+                PyLongObject *large = NULL;
+                PyLongObject *compact = NULL;
+                if (_PyLong_DigitCount(a) == 2 &&
+                    _PyLong_IsNonNegativeCompact(b))
+                {
+                    large = a;
+                    compact = b;
+                }
+                else if (_PyLong_DigitCount(b) == 2 &&
+                         _PyLong_IsNonNegativeCompact(a))
+                {
+                    large = b;
+                    compact = a;
+                }
+                if (large != NULL) {
+                    stwodigits left = ((stwodigits)large->long_value.ob_digit[1] << PyLong_SHIFT) |
+                                      large->long_value.ob_digit[0];
+                    return _PyLong_FromSTwoDigits(left + medium_value(compact));
+                }
+            }
             z = x_add(a, b);
+        }
     }
     return z;
 }
