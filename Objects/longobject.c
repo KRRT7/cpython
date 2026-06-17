@@ -3831,6 +3831,30 @@ x_sub(PyLongObject *a, PyLongObject *b)
 }
 
 static PyLongObject *
+long_add_same_sign_two_digit_int64(PyLongObject *a, PyLongObject *b)
+{
+    assert(_PyLong_IsNegative(a) == _PyLong_IsNegative(b));
+    if (!PyLong_CheckExact((PyObject *)a) ||
+        !PyLong_CheckExact((PyObject *)b))
+    {
+        return NULL;
+    }
+    if (_PyLong_DigitCount(a) != 2 || _PyLong_DigitCount(b) != 2) {
+        return NULL;
+    }
+
+    int64_t left = ((int64_t)a->long_value.ob_digit[1] << PyLong_SHIFT) |
+                   a->long_value.ob_digit[0];
+    int64_t right = ((int64_t)b->long_value.ob_digit[1] << PyLong_SHIFT) |
+                    b->long_value.ob_digit[0];
+    int64_t sum = left + right;
+    if (_PyLong_IsNegative(a)) {
+        sum = -sum;
+    }
+    return (PyLongObject *)PyLong_FromInt64(sum);
+}
+
+static PyLongObject *
 long_add(PyLongObject *a, PyLongObject *b)
 {
     if (_PyLong_BothAreCompact(a, b)) {
@@ -3841,6 +3865,10 @@ long_add(PyLongObject *a, PyLongObject *b)
     PyLongObject *z;
     if (_PyLong_IsNegative(a)) {
         if (_PyLong_IsNegative(b)) {
+            z = long_add_same_sign_two_digit_int64(a, b);
+            if (z != NULL || PyErr_Occurred()) {
+                return z;
+            }
             z = x_add(a, b);
             if (z != NULL) {
                 /* x_add received at least one multiple-digit int,
@@ -3857,8 +3885,13 @@ long_add(PyLongObject *a, PyLongObject *b)
     else {
         if (_PyLong_IsNegative(b))
             z = x_sub(a, b);
-        else
+        else {
+            z = long_add_same_sign_two_digit_int64(a, b);
+            if (z != NULL || PyErr_Occurred()) {
+                return z;
+            }
             z = x_add(a, b);
+        }
     }
     return z;
 }
