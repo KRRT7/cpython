@@ -2125,7 +2125,7 @@ long_to_decimal_string_internal(PyObject *aa,
     if (size_a >= 10 * _PY_LONG_MAX_STR_DIGITS_THRESHOLD
                   / (3 * PyLong_SHIFT) + 2) {
         PyInterpreterState *interp = _PyInterpreterState_GET();
-        int max_str_digits = interp->long_state.max_str_digits;
+        int max_str_digits = _Py_atomic_load_int(&interp->long_state.max_str_digits);
         if ((max_str_digits > 0) &&
             (max_str_digits / (3 * PyLong_SHIFT) <= (size_a - 11) / 10)) {
             PyErr_Format(PyExc_ValueError, _MAX_STR_DIGITS_ERROR_FMT_TO_STR,
@@ -2206,7 +2206,7 @@ long_to_decimal_string_internal(PyObject *aa,
     }
     if (strlen > _PY_LONG_MAX_STR_DIGITS_THRESHOLD) {
         PyInterpreterState *interp = _PyInterpreterState_GET();
-        int max_str_digits = interp->long_state.max_str_digits;
+        int max_str_digits = _Py_atomic_load_int(&interp->long_state.max_str_digits);
         Py_ssize_t strlen_nosign = strlen - negative;
         if ((max_str_digits > 0) && (strlen_nosign > max_str_digits)) {
             Py_DECREF(scratch);
@@ -3021,7 +3021,7 @@ long_from_string_base(const char **str, int base, PyLongObject **res)
          * quadratic algorithm. */
         if (digits > _PY_LONG_MAX_STR_DIGITS_THRESHOLD) {
             PyInterpreterState *interp = _PyInterpreterState_GET();
-            int max_str_digits = interp->long_state.max_str_digits;
+            int max_str_digits = _Py_atomic_load_int(&interp->long_state.max_str_digits);
             if ((max_str_digits > 0) && (digits > max_str_digits)) {
                 PyErr_Format(PyExc_ValueError, _MAX_STR_DIGITS_ERROR_FMT_TO_INT,
                              max_str_digits, digits);
@@ -3830,23 +3830,6 @@ x_sub(PyLongObject *a, PyLongObject *b)
     return maybe_small_long(long_normalize(z));
 }
 
-Py_NO_INLINE static PyLongObject *
-long_add_positive_two_digit(PyLongObject *a, PyLongObject *b)
-{
-    assert(!_PyLong_IsNegative(a));
-    assert(!_PyLong_IsNegative(b));
-    assert(PyLong_CheckExact((PyObject *)a));
-    assert(PyLong_CheckExact((PyObject *)b));
-    assert(_PyLong_DigitCount(a) == 2);
-    assert(_PyLong_DigitCount(b) == 2);
-
-    stwodigits left = ((stwodigits)a->long_value.ob_digit[1] << PyLong_SHIFT) |
-                      a->long_value.ob_digit[0];
-    stwodigits right = ((stwodigits)b->long_value.ob_digit[1] << PyLong_SHIFT) |
-                       b->long_value.ob_digit[0];
-    return _PyLong_FromSTwoDigits(left + right);
-}
-
 static PyLongObject *
 long_add(PyLongObject *a, PyLongObject *b)
 {
@@ -3874,15 +3857,8 @@ long_add(PyLongObject *a, PyLongObject *b)
     else {
         if (_PyLong_IsNegative(b))
             z = x_sub(a, b);
-        else {
-            if (_PyLong_DigitCount(a) == 2 && _PyLong_DigitCount(b) == 2 &&
-                PyLong_CheckExact((PyObject *)a) &&
-                PyLong_CheckExact((PyObject *)b))
-            {
-                return long_add_positive_two_digit(a, b);
-            }
+        else
             z = x_add(a, b);
-        }
     }
     return z;
 }
