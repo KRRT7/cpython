@@ -198,7 +198,6 @@ const _PyOpcodeRecordEntry _PyOpcode_RecordEntries[256] = {
         [CALL_EX_PY] = {1, {_RECORD_4OS_INDEX}},
         [CALL_EX_NON_PY_GENERAL] = {1, {_RECORD_4OS_INDEX}},
         [BINARY_OP] = {2, {_RECORD_NOS_INDEX, _RECORD_TOS_TYPE_INDEX}},
-        [BINARY_OP_ADD_INT64] = {2, {_RECORD_NOS_INDEX, _RECORD_TOS_TYPE_INDEX}},
 };
 
 const _PyOpcodeRecordSlotMap _PyOpcode_RecordSlotMaps[256] = {
