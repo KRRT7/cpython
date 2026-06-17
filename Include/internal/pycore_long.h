@@ -116,7 +116,6 @@ PyAPI_DATA(PyObject*) _PyLong_Lshift(PyObject *, int64_t);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Add(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Multiply(PyLongObject *left, PyLongObject *right);
 PyAPI_FUNC(_PyStackRef) _PyCompactLong_Subtract(PyLongObject *left, PyLongObject *right);
-PyAPI_FUNC(int) _PyLong_AddInt64(PyObject *left, PyObject *right, PyObject **result);
 
 // Export for 'binascii' shared extension.
 PyAPI_DATA(unsigned char) _PyLong_DigitValue[256];
@@ -345,61 +344,6 @@ static inline int
 _PyLong_CheckExactAndCompact(PyObject *op)
 {
     return PyLong_CheckExact(op) && _PyLong_IsCompact((const PyLongObject *)op);
-}
-
-static inline int
-_PyLong_CheckExactAndInt64(PyObject *op, int64_t *out)
-{
-    if (!PyLong_CheckExact(op)) {
-        return 0;
-    }
-    const PyLongObject *v = (const PyLongObject *)op;
-    Py_ssize_t ndigits = _PyLong_DigitCount(v);
-    Py_ssize_t max_digits = (64 + PyLong_SHIFT - 1) / PyLong_SHIFT;
-    if (ndigits > max_digits) {
-        return 0;
-    }
-    if (ndigits == max_digits) {
-        int top_bits = 64 - (int)((max_digits - 1) * PyLong_SHIFT);
-        digit top_digit = v->long_value.ob_digit[ndigits - 1];
-        if ((top_digit >> top_bits) != 0) {
-            return 0;
-        }
-    }
-    uint64_t value = 0;
-    for (Py_ssize_t i = ndigits; i-- > 0;) {
-        value = (value << PyLong_SHIFT) | v->long_value.ob_digit[i];
-    }
-    if (ndigits == max_digits) {
-        /* The top digit may still overflow signed int64_t. */
-        if (_PyLong_IsNegative(v)) {
-            if (value > (uint64_t)INT64_MAX + 1) {
-                return 0;
-            }
-            if (out != NULL) {
-                *out = (int64_t)(0ULL - value);
-            }
-            return 1;
-        }
-        if (value > (uint64_t)INT64_MAX) {
-            return 0;
-        }
-        if (out != NULL) {
-            *out = (int64_t)value;
-        }
-        return 1;
-    }
-    if (_PyLong_IsNegative(v)) {
-        if (out != NULL) {
-            *out = (int64_t)(0ULL - value);
-        }
-    }
-    else {
-        if (out != NULL) {
-            *out = (int64_t)value;
-        }
-    }
-    return 1;
 }
 
 #ifdef __cplusplus

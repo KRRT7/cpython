@@ -321,6 +321,23 @@ class LongTest(unittest.TestCase):
                 x = self.getran(lenx)
                 self.check_format_1(x)
 
+    def test_add_int64_boundaries(self):
+        int64_min = -(1 << 63)
+        int64_max = (1 << 63) - 1
+        cases = [
+            (int64_max, 0, int64_max),
+            (int64_max, -1, int64_max - 1),
+            (int64_min, 0, int64_min),
+            (int64_min, 1, int64_min + 1),
+            (int64_min + 1, -1, int64_min),
+            (int64_max, 1, int64_max + 1),
+            (int64_min, -1, int64_min - 1),
+        ]
+        for a, b, expected in cases:
+            with self.subTest(a=a, b=b):
+                self.assertEqual(a + b, expected)
+                self.assertEqual(b + a, expected)
+
     def test_long(self):
         # Check conversions from string
         LL = [

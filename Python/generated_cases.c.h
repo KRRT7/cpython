@@ -241,57 +241,6 @@
             DISPATCH();
         }
 
-        TARGET(BINARY_OP_ADD_INT64) {
-            #if _Py_TAIL_CALL_INTERP
-            int opcode = BINARY_OP_ADD_INT64;
-            (void)(opcode);
-            #endif
-            _Py_CODEUNIT* const this_instr = next_instr;
-            (void)this_instr;
-            frame->instr_ptr = next_instr;
-            next_instr += 6;
-            INSTRUCTION_STATS(BINARY_OP_ADD_INT64);
-            static_assert(INLINE_CACHE_ENTRIES_BINARY_OP == 5, "incorrect cache size");
-            _PyStackRef left;
-            _PyStackRef right;
-            _PyStackRef res;
-            /* Skip 5 cache entries */
-            right = stack_pointer[-1];
-            left = stack_pointer[-2];
-            PyObject *left_o = PyStackRef_AsPyObjectBorrow(left);
-            PyObject *right_o = PyStackRef_AsPyObjectBorrow(right);
-            PyObject *res_o;
-            _PyFrame_SetStackPointer(frame, stack_pointer);
-            int result = _PyLong_AddInt64(left_o, right_o, &res_o);
-            stack_pointer = _PyFrame_GetStackPointer(frame);
-            if (result == 0) {
-                UPDATE_MISS_STATS(BINARY_OP);
-                assert(_PyOpcode_Deopt[opcode] == (BINARY_OP));
-                JUMP_TO_PREDICTED(BINARY_OP);
-            }
-            STAT_INC(BINARY_OP, hit);
-            _PyFrame_SetStackPointer(frame, stack_pointer);
-            _PyStackRef tmp = right;
-            right = PyStackRef_NULL;
-            stack_pointer[-1] = right;
-            PyStackRef_CLOSE(tmp);
-            tmp = left;
-            left = PyStackRef_NULL;
-            stack_pointer[-2] = left;
-            PyStackRef_CLOSE(tmp);
-            stack_pointer = _PyFrame_GetStackPointer(frame);
-            stack_pointer += -2;
-            ASSERT_WITHIN_STACK_BOUNDS(__FILE__, __LINE__);
-            if (result < 0) {
-                JUMP_TO_LABEL(error);
-            }
-            res = PyStackRef_FromPyObjectSteal(res_o);
-            stack_pointer[0] = res;
-            stack_pointer += 1;
-            ASSERT_WITHIN_STACK_BOUNDS(__FILE__, __LINE__);
-            DISPATCH();
-        }
-
         TARGET(BINARY_OP_ADD_UNICODE) {
             #if _Py_TAIL_CALL_INTERP
             int opcode = BINARY_OP_ADD_UNICODE;
