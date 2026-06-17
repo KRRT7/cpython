@@ -3830,43 +3830,27 @@ x_sub(PyLongObject *a, PyLongObject *b)
     return maybe_small_long(long_normalize(z));
 }
 
-static int
-long_check_exact_and_int64(PyLongObject *v, int64_t *out)
+static PyLongObject *
+long_add_two_digit_int64(PyLongObject *a, PyLongObject *b)
 {
-    if (!PyLong_CheckExact((PyObject *)v)) {
-        return 0;
+    if (!PyLong_CheckExact((PyObject *)a) ||
+        !PyLong_CheckExact((PyObject *)b))
+    {
+        return NULL;
     }
 
-    Py_ssize_t ndigits = _PyLong_DigitCount(v);
-    Py_ssize_t max_digits = (64 + PyLong_SHIFT - 1) / PyLong_SHIFT;
-    if (ndigits > max_digits) {
-        return 0;
-    }
-    if (ndigits == max_digits) {
-        int top_bits = 64 - (int)((max_digits - 1) * PyLong_SHIFT);
-        digit top_digit = v->long_value.ob_digit[ndigits - 1];
-        if ((top_digit >> top_bits) != 0) {
-            return 0;
-        }
+    if (_PyLong_DigitCount(a) != 2 || _PyLong_DigitCount(b) != 2) {
+        return NULL;
     }
 
-    uint64_t value = 0;
-    for (Py_ssize_t i = ndigits; i-- > 0;) {
-        value = (value << PyLong_SHIFT) | v->long_value.ob_digit[i];
-    }
-    if (ndigits == max_digits) {
-        if (_PyLong_IsNegative(v)) {
-            if (value > (uint64_t)INT64_MAX + 1) {
-                return 0;
-            }
-        }
-        else if (value > (uint64_t)INT64_MAX) {
-            return 0;
-        }
-    }
+    int64_t left = ((int64_t)a->long_value.ob_digit[1] << PyLong_SHIFT) |
+                   a->long_value.ob_digit[0];
+    int64_t right = ((int64_t)b->long_value.ob_digit[1] << PyLong_SHIFT) |
+                    b->long_value.ob_digit[0];
+    left = _PyLong_IsNegative(a) ? -left : left;
+    right = _PyLong_IsNegative(b) ? -right : right;
 
-    *out = _PyLong_IsNegative(v) ? (int64_t)(0ULL - value) : (int64_t)value;
-    return 1;
+    return (PyLongObject *)PyLong_FromInt64(left + right);
 }
 
 static PyLongObject *
@@ -3877,15 +3861,9 @@ long_add(PyLongObject *a, PyLongObject *b)
         return _PyLong_FromSTwoDigits(z);
     }
 
-    int64_t left_i;
-    int64_t right_i;
-    if (long_check_exact_and_int64(a, &left_i) &&
-        long_check_exact_and_int64(b, &right_i))
-    {
-        int64_t sum;
-        if (!__builtin_add_overflow(left_i, right_i, &sum)) {
-            return (PyLongObject *)PyLong_FromInt64(sum);
-        }
+    PyLongObject *two_digit_sum = long_add_two_digit_int64(a, b);
+    if (two_digit_sum != NULL || PyErr_Occurred()) {
+        return two_digit_sum;
     }
 
     PyLongObject *z;
