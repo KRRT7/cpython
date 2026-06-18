@@ -3742,6 +3742,12 @@ long_hash(PyObject *obj)
 
 /* Add the absolute values of two integers. */
 
+#if defined(__GNUC__) || defined(__clang__)
+#  define LONG_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#  define LONG_UNLIKELY(x) (x)
+#endif
+
 static PyLongObject *
 x_add(PyLongObject *a, PyLongObject *b)
 {
@@ -3757,7 +3763,7 @@ x_add(PyLongObject *a, PyLongObject *b)
             size_a = size_b;
             size_b = size_temp; }
     }
-    if (size_a == 2 && size_b == 1) {
+    if (LONG_UNLIKELY(size_a == 2 && size_b == 1)) {
         stwodigits left = ((stwodigits)a->long_value.ob_digit[1] << PyLong_SHIFT) |
                           a->long_value.ob_digit[0];
         return _PyLong_FromSTwoDigits(left + b->long_value.ob_digit[0]);
@@ -3778,6 +3784,8 @@ x_add(PyLongObject *a, PyLongObject *b)
     z->long_value.ob_digit[i] = carry;
     return long_normalize(z);
 }
+
+#undef LONG_UNLIKELY
 
 /* Subtract the absolute values of two integers. */
 
