@@ -3757,6 +3757,11 @@ x_add(PyLongObject *a, PyLongObject *b)
             size_a = size_b;
             size_b = size_temp; }
     }
+    if (size_a == 2 && size_b == 1) {
+        stwodigits left = ((stwodigits)a->long_value.ob_digit[1] << PyLong_SHIFT) |
+                          a->long_value.ob_digit[0];
+        return _PyLong_FromSTwoDigits(left + b->long_value.ob_digit[0]);
+    }
     z = long_alloc(size_a+1);
     if (z == NULL)
         return NULL;
@@ -3830,29 +3835,6 @@ x_sub(PyLongObject *a, PyLongObject *b)
     return maybe_small_long(long_normalize(z));
 }
 
-static Py_NO_INLINE PyLongObject *
-long_add_positive_compact_2digits(PyLongObject *a, PyLongObject *b)
-{
-    PyLongObject *large;
-    PyLongObject *compact;
-
-    if (_PyLong_DigitCount(a) == 2 && _PyLong_IsNonNegativeCompact(b)) {
-        large = a;
-        compact = b;
-    }
-    else if (_PyLong_DigitCount(b) == 2 && _PyLong_IsNonNegativeCompact(a)) {
-        large = b;
-        compact = a;
-    }
-    else {
-        return NULL;
-    }
-
-    stwodigits left = ((stwodigits)large->long_value.ob_digit[1] << PyLong_SHIFT) |
-                      large->long_value.ob_digit[0];
-    return _PyLong_FromSTwoDigits(left + medium_value(compact));
-}
-
 static PyLongObject *
 long_add(PyLongObject *a, PyLongObject *b)
 {
@@ -3880,15 +3862,8 @@ long_add(PyLongObject *a, PyLongObject *b)
     else {
         if (_PyLong_IsNegative(b))
             z = x_sub(a, b);
-        else {
-            if (PyLong_CheckExact((PyObject *)a) && PyLong_CheckExact((PyObject *)b)) {
-                z = long_add_positive_compact_2digits(a, b);
-                if (z != NULL) {
-                    return z;
-                }
-            }
+        else
             z = x_add(a, b);
-        }
     }
     return z;
 }
