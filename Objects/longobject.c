@@ -3830,12 +3830,20 @@ x_sub(PyLongObject *a, PyLongObject *b)
     return maybe_small_long(long_normalize(z));
 }
 
+static PyLongObject *_PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b);
+static PyLongObject *_PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b);
+
 static PyLongObject *
 long_add(PyLongObject *a, PyLongObject *b)
 {
     if (_PyLong_BothAreCompact(a, b)) {
         stwodigits z = medium_value(a) + medium_value(b);
         return _PyLong_FromSTwoDigits(z);
+    }
+
+    PyLongObject *fast = _PyCompactLong_AddWide(a, b);
+    if (fast != NULL || PyErr_Occurred()) {
+        return fast;
     }
 
     PyLongObject *z;
@@ -3871,6 +3879,124 @@ _PyCompactLong_Add(PyLongObject *a, PyLongObject *b)
     return medium_from_stwodigits(v);
 }
 
+/* Max number of digits a PyLong can have and still fit in int64_t.
+ * 30-bit builds: ceil(64/30) = 3. 15-bit builds: ceil(64/15) = 5. */
+#define _PY_LONG_MAX_DIGITS_FOR_INT64 ((64 + PyLong_SHIFT - 1) / PyLong_SHIFT)
+
+static inline bool
+_PyLong_TryAsInt64ExactLocal(PyLongObject *v, int64_t *out)
+{
+    assert(PyLong_CheckExact((PyObject *)v));
+    uintptr_t tag = v->long_value.lv_tag;
+    int sign = 1 - (int)(tag & SIGN_MASK);
+    if (tag < (2u << NON_SIZE_BITS)) {
+        *out = (int64_t)(sign * (Py_ssize_t)v->long_value.ob_digit[0]);
+        return true;
+    }
+    Py_ssize_t ndigits = (Py_ssize_t)(tag >> NON_SIZE_BITS);
+    if (ndigits > _PY_LONG_MAX_DIGITS_FOR_INT64) {
+        return false;
+    }
+    uint64_t abs_val = 0;
+#if PyLong_SHIFT == 30
+    if (ndigits == 2) {
+        abs_val = (uint64_t)v->long_value.ob_digit[0] |
+                  ((uint64_t)v->long_value.ob_digit[1] << 30);
+        *out = sign < 0 ? -(int64_t)abs_val : (int64_t)abs_val;
+        return true;
+    }
+#endif
+    unsigned int shift = 0;
+    for (Py_ssize_t i = 0; i < ndigits - 1; i++) {
+        abs_val |= (uint64_t)v->long_value.ob_digit[i] << shift;
+        shift += PyLong_SHIFT;
+    }
+    uint64_t top = (uint64_t)v->long_value.ob_digit[ndigits - 1];
+    if (ndigits == _PY_LONG_MAX_DIGITS_FOR_INT64 && (top >> (64 - shift)) != 0) {
+        return false;
+    }
+    abs_val |= top << shift;
+    if (abs_val <= (uint64_t)INT64_MAX) {
+        *out = sign < 0 ? -(int64_t)abs_val : (int64_t)abs_val;
+        return true;
+    }
+    if (sign < 0 && abs_val == (uint64_t)INT64_MAX + 1) {
+        *out = INT64_MIN;
+        return true;
+    }
+    return false;
+}
+
+static inline bool
+_Py_i64_add_overflow(int64_t a, int64_t b, int64_t *out)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_add_overflow(a, b, out);
+#else
+    if ((b > 0 && a > INT64_MAX - b) || (b < 0 && a < INT64_MIN - b)) {
+        return true;
+    }
+    *out = a + b;
+    return false;
+#endif
+}
+
+static inline PyLongObject *
+_wide_op_result(int64_t v)
+{
+    if (IS_SMALL_INT(v)) {
+        return (PyLongObject *)Py_NewRef(get_small_int((sdigit)v));
+    }
+    assert(v != 0);
+    if (is_medium_int(v)) {
+        PyLongObject *result = (PyLongObject *)_Py_FREELIST_POP(PyLongObject, ints);
+        if (result == NULL) {
+            result = PyObject_Malloc(sizeof(PyLongObject));
+            if (result == NULL) {
+                return (PyLongObject *)PyErr_NoMemory();
+            }
+            _PyObject_Init((PyObject *)result, &PyLong_Type);
+            _PyLong_InitTag(result);
+        }
+        digit abs_v = v < 0 ? (digit)(-(sdigit)v) : (digit)(sdigit)v;
+        _PyLong_SetSignAndDigitCount(result, v < 0 ? -1 : 1, 1);
+        result->long_value.ob_digit[0] = abs_v;
+        return result;
+    }
+    return (PyLongObject *)_PyLong_FromLarge(v);
+}
+
+/* Exact int -> int64_t helper for the wide int fast path.
+ * Keeps the exact-type check local to this translation unit. */
+static inline bool
+_PyLong_CheckExactAndTryAsInt64(PyObject *op, int64_t *out)
+{
+    return PyLong_CheckExact(op) &&
+        _PyLong_TryAsInt64ExactLocal((PyLongObject *)op, out);
+}
+
+/* Wide variant: operands are exact ints in the full int64 range (may be
+ * non-compact). Returns NULL without raising when an input is out of int64
+ * range or the sum overflows int64. */
+static PyLongObject *
+_PyCompactLong_AddWide(PyLongObject *a, PyLongObject *b)
+{
+    if (_PyLong_BothAreCompact(a, b)) {
+        stwodigits v = medium_value(a) + medium_value(b);
+        return _PyLong_FromSTwoDigits(v);
+    }
+    int64_t va, vb;
+    if (!_PyLong_CheckExactAndTryAsInt64((PyObject *)a, &va) ||
+        !_PyLong_CheckExactAndTryAsInt64((PyObject *)b, &vb)) {
+        return NULL;
+    }
+    int64_t v;
+    if (_Py_i64_add_overflow(va, vb, &v)) {
+        return NULL;
+    }
+    return _wide_op_result(v);
+}
+
 static PyObject *
 long_add_method(PyObject *a, PyObject *b)
 {
@@ -3884,6 +4010,11 @@ long_sub(PyLongObject *a, PyLongObject *b)
 {
     if (_PyLong_BothAreCompact(a, b)) {
         return _PyLong_FromSTwoDigits(medium_value(a) - medium_value(b));
+    }
+
+    PyLongObject *fast = _PyCompactLong_SubtractWide(a, b);
+    if (fast != NULL || PyErr_Occurred()) {
+        return fast;
     }
 
     PyLongObject *z;
@@ -3914,6 +4045,39 @@ _PyCompactLong_Subtract(PyLongObject *a, PyLongObject *b)
     assert(_PyLong_BothAreCompact(a, b));
     stwodigits v = medium_value(a) - medium_value(b);
     return medium_from_stwodigits(v);
+}
+
+static inline bool
+_Py_i64_sub_overflow(int64_t a, int64_t b, int64_t *out)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_sub_overflow(a, b, out);
+#else
+    if ((b < 0 && a > INT64_MAX + b) || (b > 0 && a < INT64_MIN + b)) {
+        return true;
+    }
+    *out = a - b;
+    return false;
+#endif
+}
+
+static PyLongObject *
+_PyCompactLong_SubtractWide(PyLongObject *a, PyLongObject *b)
+{
+    if (_PyLong_BothAreCompact(a, b)) {
+        stwodigits v = medium_value(a) - medium_value(b);
+        return _PyLong_FromSTwoDigits(v);
+    }
+    int64_t va, vb;
+    if (!_PyLong_CheckExactAndTryAsInt64((PyObject *)a, &va) ||
+        !_PyLong_CheckExactAndTryAsInt64((PyObject *)b, &vb)) {
+        return NULL;
+    }
+    int64_t v;
+    if (_Py_i64_sub_overflow(va, vb, &v)) {
+        return NULL;
+    }
+    return _wide_op_result(v);
 }
 
 static PyObject *
