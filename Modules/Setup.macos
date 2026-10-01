@@ -231,19 +231,7 @@ _zstd _zstd/_zstdmodule.c _zstd/compressor.c _zstd/decompressor.c _zstd/zstddict
 _ssl _ssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -lssl -lcrypto
 _hashlib _hashopenssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -lcrypto
 
-# The _tkinter module.
-#
-# The command for _tkinter is long and site specific.  Please
-# uncomment and/or edit those parts as indicated.  If you don't have a
-# specific extension (e.g. Tix or BLT), leave the corresponding line
-# commented out.  (Leave the trailing backslashes in!  If you
-# experience strange errors, you may want to join all uncommented
-# lines and remove the backslashes -- the backslash interpretation is
-# done by the shell's "read" command and it may not be implemented on
-# every system.
-
-# *** Always uncomment this (leave the leading underscore in!):
-_tkinter _tkinter.c tkappinit.c -DWITH_APPINIT $(TCLTK_INCLUDES) $(TCLTK_LIBS) -ltk8.6 -ltcl8.6 -framework Cocoa -framework Carbon -framework IOKit -framework QuartzCore -framework CoreServices -framework CoreFoundation -framework ApplicationServices -framework UniformTypeIdentifiers
+# _tkinter is not built: Tcl/Tk are left out (see *disabled*).
 
 # ncursesw wide-char support. _XOPEN_SOURCE_EXTENDED=1 is what exposes
 # wget_wch/mvwget_wch/wins_wstr/etc. that _cursesmodule.c uses
@@ -283,6 +271,7 @@ _scproxy _scproxy.c
 #
 *disabled*
 
+_tkinter
 _xxsubinterpreters
 audioop
 _testcapi

@@ -86,11 +86,10 @@ cp Include/mp_embed.h ${PREFIX}/include/
 
 mkdir -p dep-build
 
-# harfbuzz (>= 9) is meson-only, so we need meson + ninja to build it. zstandard
-# gives mkembeddata a zstd backend when python3 predates 3.14 (compression.zstd).
-# Install them for the build user; put the user script dir first, and
-# ${PREFIX}/bin (where the pkg-config we build below lands) on PATH.
-python3 -m pip install --user --quiet meson ninja zstandard || python3 -m pip install --user --quiet --break-system-packages meson ninja zstandard
+# zstandard gives mkembeddata a zstd backend when python3 predates 3.14
+# (compression.zstd). Install it for the build user; put the user script dir
+# first, and ${PREFIX}/bin (where the pkg-config we build below lands) on PATH.
+python3 -m pip install --user --quiet zstandard || python3 -m pip install --user --quiet --break-system-packages zstandard
 export PATH="$(python3 -m site --user-base)/bin:${PREFIX}/bin:$PATH"
 
 download_file() {
@@ -269,21 +268,8 @@ make install
 cd ..
 fi
 
-if [ ! -d libpng-1.6.50 ]; then
-download_file http://downloads.sourceforge.net/project/libpng/libpng16/1.6.50/libpng-1.6.50.tar.xz libpng.tar.gz
-tar -xf libpng.tar.gz
-cd libpng-1.6.50
-./configure --prefix=${PREFIX} --disable-shared --with-zlib-prefix=${PREFIX}
-make pnglibconf.h
-find . \( -iname '*.h.in' -o -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' -o -iname '*.cxx' \) | xargs sed -i '' '1s/^/#include "mp_embed.h"\n\'$'\n/g'
-sed -i '' -e 's/define PNG_ZLIB_VERNUM 0x[0-9a-z][0-9a-z][0-9a-z][0-9a-z]/define PNG_ZLIB_VERNUM 0/g' pnglibconf.h
-make -j$(sysctl -n hw.ncpu)
-make install
-cd ..
-fi
-
-# pkgconf provides the pkg-config that harfbuzz's meson build uses to find
-# freetype. macOS ships no pkg-config, so build it from source.
+# macOS ships no pkg-config, so build it from source for configure scripts
+# that look for one.
 if [ ! -x ${PREFIX}/bin/pkg-config ]; then
 download_file https://github.com/pkgconf/pkgconf/releases/download/pkgconf-3.0.3/pkgconf-3.0.3.tar.xz pkgconf.tar.xz
 tar -xf pkgconf.tar.xz
@@ -295,48 +281,6 @@ ln -sf pkgconf ${PREFIX}/bin/pkg-config
 cd ..
 fi
 
-if [ ! -d harfbuzz-14.2.1 ]; then
-download_file https://github.com/harfbuzz/harfbuzz/releases/download/14.2.1/harfbuzz-14.2.1.tar.xz harfbuzz.tar.gz
-tar -xf harfbuzz.tar.gz
-cd harfbuzz-14.2.1
-find . \( -iname '*.h.in' -o -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' -o -iname '*.cxx' \) | xargs sed -i '' '1s/^/#include "mp_embed.h"\n\'$'\n/g'
-# harfbuzz >= 9 dropped autotools and is meson-only. Build a static lib with
-# freetype disabled on this first pass (freetype is built next, then harfbuzz
-# is rebuilt with freetype enabled). meson finds freetype via pkg-config.
-meson setup build-pass1 --prefix=${PREFIX} --libdir=lib --default-library=static --buildtype=release -Dfreetype=disabled -Dtests=disabled -Ddocs=disabled -Dutilities=disabled -Dglib=disabled -Dgobject=disabled -Dcairo=disabled -Dicu=disabled
-meson install -C build-pass1
-cd ..
-fi
-
-if [ ! -d freetype-2.14.3 ]; then
-download_file http://downloads.sourceforge.net/project/freetype/freetype2/2.14.3/freetype-2.14.3.tar.xz freetype.tar.gz
-tar -xf freetype.tar.gz
-cd freetype-2.14.3
-find . \( -iname '*.h.in' -o -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' -o -iname '*.cxx' \) | xargs sed -i '' '1s/^/#include "mp_embed.h"\n\'$'\n/g'
-./configure --prefix=${PREFIX} --disable-shared --with-brotli=no
-make -j$(sysctl -n hw.ncpu)
-make install
-cd ..
-
-cd harfbuzz-14.2.1
-# Rebuild harfbuzz now that freetype is installed (found via pkg-config).
-meson setup build-pass2 --prefix=${PREFIX} --libdir=lib --default-library=static --buildtype=release -Dfreetype=enabled -Dtests=disabled -Ddocs=disabled -Dutilities=disabled -Dglib=disabled -Dgobject=disabled -Dcairo=disabled -Dicu=disabled
-meson install -C build-pass2
-cd ..
-fi
-
-if [ ! -d tcl8.6.18 ]; then
-download_file http://downloads.sourceforge.net/project/tcl/Tcl/8.6.18/tcl8.6.18-src.tar.gz tcl.tar.gz
-tar -xf tcl.tar.gz
-cd tcl8.6.18
-rm -rf pkgs/tdbc* pkgs/sqlite*
-cd unix
-./configure --prefix=${PREFIX} --enable-shared=no --enable-threads
-make -j$(sysctl -n hw.ncpu)
-make install
-cd ../..
-fi
-
 if [ ! -d expat-2.8.2 ]; then
 download_file https://github.com/libexpat/libexpat/releases/download/R_2_8_2/expat-2.8.2.tar.gz expat.tar.gz
 tar -xf expat.tar.gz
@@ -345,16 +289,6 @@ cd expat-2.8.2
 make -j$(sysctl -n hw.ncpu)
 make install
 cd ..
-fi
-
-if [ ! -d tk8.6.18 ]; then
-download_file http://downloads.sourceforge.net/project/tcl/Tcl/8.6.18/tk8.6.18-src.tar.gz tk.tar.gz
-tar -xf tk.tar.gz
-cd tk8.6.18/unix
-./configure --prefix=${PREFIX} --enable-shared=no --enable-threads --with-tcl=${PREFIX}/lib --enable-aqua
-make -j$(sysctl -n hw.ncpu)
-make install
-cd ../..
 fi
 
 if [ ! -d mpdecimal-4.0.1 ]; then

@@ -224,18 +224,7 @@ zlib  zlibmodule.c -l:libz.a
 _ssl _ssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -l:libssl.a -l:libcrypto.a
 _hashlib _hashopenssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -l:libcrypto.a
 
-# The _tkinter module.
-#
-# The command for _tkinter is long and site specific.  Please
-# uncomment and/or edit those parts as indicated.  If you don't have a
-# specific extension (e.g. Tix or BLT), leave the corresponding line
-# commented out.  (Leave the trailing backslashes in!  If you
-# experience strange errors, you may want to join all uncommented
-# lines and remove the backslashes -- the backslash interpretation is
-# done by the shell's "read" command and it may not be implemented on
-# every system.
-
-_tkinter _tkinter.c tkappinit.c -DWITH_APPINIT $(TCLTK_INCLUDES) $(TCLTK_LIBS) -l:libtk8.6.a -l:libtcl8.6.a -l:libX11.a -l:libxcb.a -l:libXss.a -l:libfontconfig.a -l:libXft.a -l:libXext.a -l:libXrandr.a -l:libXau.a -l:libXrender.a -l:libXdmcp.a -l:libfreetype.a -l:libexpat.a -l:libpng.a -l:libharfbuzz.a -l:libX11.a -l:libxcb.a
+# _tkinter is not built: Tcl/Tk and X11 are left out (see *disabled*).
 
 # Some system have -lcurses
 _curses -l:libncursesw.a _cursesmodule.c
@@ -273,6 +262,7 @@ _curses_panel -l:libpanelw.a -l:libncursesw.a _curses_panel.c
 #
 *disabled*
 
+_tkinter
 _xxsubinterpreters
 audioop
 _testcapi
