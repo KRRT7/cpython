@@ -809,15 +809,11 @@ static inline void Py_InitStaticModules(void) {
                               + extra_link_args \
                               + [
                                   "-flto=thin",
+                                  # What _scproxy uses. The other frameworks
+                                  # are Tk's, and macOS loads every linked one
+                                  # at start-up whether a module uses it or not.
                                   "-framework", "SystemConfiguration",
                                   "-framework", "CoreFoundation",
-                                  "-framework", "Cocoa",
-                                  "-framework", "Carbon",
-                                  "-framework", "IOKit",
-                                  "-framework", "QuartzCore",
-                                  "-framework", "CoreServices",
-                                  "-framework", "ApplicationServices",
-                                  "-framework", "UniformTypeIdentifiers"
                               ]
         num_link_threads = os.environ.get("LINK_THREADS", None)
         if num_link_threads is not None:
