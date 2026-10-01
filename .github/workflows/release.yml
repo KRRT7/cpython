@@ -100,6 +100,27 @@ jobs:
             find "$1" -type f -path '*/bin/*' -exec chmod +x {} +
           }
 
+          # Nor does it keep symlinks: it stores a copy of what one points
+          # to, so bin/python3 comes back as a second interpreter beside
+          # bin/python3.X, and rebuildpython, which replaces only the one it
+          # runs as, leaves the other behind. Point the unversioned names at
+          # the versioned ones again, as CPython's install does.
+          restore_bin_symlinks() {
+            local bin="$1/bin" versioned version short long
+            [ -d "$bin" ] || return 0
+            for versioned in "$bin"/python3.*[0-9]; do
+              [ -f "$versioned" ] || continue
+              version="${versioned##*/python}"
+              for short in python3 python3-config pydoc3 idle3; do
+                long="${short/3/$version}"
+                if [ -f "$bin/$short" ] && [ ! -L "$bin/$short" ] && [ -f "$bin/$long" ] \
+                    && cmp -s "$bin/$short" "$bin/$long"; then
+                  ln -sf "$long" "$bin/$short"
+                fi
+              done
+            done
+          }
+
           for d in dist/*/; do
             name="$(basename "$d")"
             case "$name" in
@@ -107,6 +128,7 @@ jobs:
                 ( cd "$d" && zip -qr "$GITHUB_WORKSPACE/assets/$name.zip" . ) ;;
               *)
                 restore_exec_bits "$d"
+                restore_bin_symlinks "$d"
                 tar -C "$d" -czf "assets/$name.tar.gz" . ;;
             esac
           done

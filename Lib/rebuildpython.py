@@ -3,6 +3,7 @@ from __future__ import print_function
 import __mp__
 import ctypes
 import setuptools._distutils.ccompiler as ccompiler
+import filecmp
 import fnmatch
 import glob
 import hashlib
@@ -156,6 +157,52 @@ def resolve_library(lib, base_paths):
             return path
 
     return lib
+
+
+def replace_interpreter(built_path):
+    """Install the interpreter at ``built_path`` in place of the running one.
+
+    The old one is moved to a temporary name and deleted, rather than
+    overwritten. A release unpacked from a CI artifact can carry
+    ``python3`` as a copy of ``python3.X`` rather than a symlink to it, and
+    replacing only the one that runs would leave the other behind on the
+    old build. So the new interpreter goes to the versioned name when one of
+    the copies has it, as CPython installs it, and every other copy becomes
+    a symlink to it.
+    """
+    interpreter_path = os.path.realpath(sys.executable)
+    bin_dir = os.path.dirname(interpreter_path)
+
+    copies = [interpreter_path]
+    for name in os.listdir(bin_dir):
+        path = os.path.join(bin_dir, name)
+        if (
+            path != interpreter_path
+            and os.path.isfile(path)
+            and not os.path.islink(path)
+            and os.path.getsize(path) == os.path.getsize(interpreter_path)
+            and filecmp.cmp(path, interpreter_path, shallow=False)
+        ):
+            copies.append(path)
+
+    versioned = "python%d.%d" % sys.version_info[:2]
+    target = next(
+        (path for path in copies if os.path.basename(path) == versioned),
+        interpreter_path,
+    )
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, dir=bin_dir)
+    tmp.close()
+    os.unlink(tmp.name)
+    shutil.move(target, tmp.name)
+    os.unlink(tmp.name)
+
+    shutil.move(built_path, target)
+
+    for path in copies:
+        if path != target:
+            os.unlink(path)
+            os.symlink(os.path.basename(target), path)
 
 
 def run_rebuild():
@@ -727,18 +774,7 @@ static inline void Py_InitStaticModules(void) {
                                                           "print('Interpreter OK')"):
             raise RuntimeError("Failed to rebuild a working interpreter!")
 
-        # Replace running interpreter by moving current version to a temp file, then deleting it. This
-        # is to avoid Windows locks
-        interpreter_path = os.path.realpath(sys.executable)
-        tmp = tempfile.NamedTemporaryFile(
-            delete=False, dir=os.path.dirname(sys.executable)
-        )
-        tmp.close()
-        os.unlink(tmp.name)
-        shutil.move(interpreter_path, tmp.name)
-        os.unlink(tmp.name)
-
-        shutil.move(os.path.join(build_dir, "python"), interpreter_path)
+        replace_interpreter(os.path.join(build_dir, "python"))
     elif platform.system() == "Darwin":
         sysconfig_libs = []
         sysconfig_lib_dirs = []
@@ -876,18 +912,7 @@ static inline void Py_InitStaticModules(void) {
 
         link_flags = final_extra_link_args
 
-        # Replace running interpreter by moving current version to a temp file, then deleting it. This
-        # is to avoid Windows locks
-        interpreter_path = os.path.realpath(sys.executable)
-        tmp = tempfile.NamedTemporaryFile(
-            delete=False, dir=os.path.dirname(sys.executable)
-        )
-        tmp.close()
-        os.unlink(tmp.name)
-        shutil.move(interpreter_path, tmp.name)
-        os.unlink(tmp.name)
-
-        shutil.move(os.path.join(build_dir, "python"), interpreter_path)
+        replace_interpreter(os.path.join(build_dir, "python"))
 
     shutil.rmtree(build_dir, ignore_errors=True)
 
