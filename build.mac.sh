@@ -329,6 +329,11 @@ if [[ "$LTO" == "1" ]]; then
     LTO_BUILD_OPT=--with-lto
 fi
 
+# The profile-guided build trains on this. MONOLITHPY_PROFILE_TASK replaces
+# it, with a script that also trains on an application the interpreter will
+# run, for one.
+profile_task="${MONOLITHPY_PROFILE_TASK:--m test --pgo -x test_json }"
+
 ./configure "--prefix=$target" --disable-shared --enable-ipv6 --enable-unicode=ucs4 \
   --enable-optimizations $LTO_BUILD_OPT --with-computed-gotos --with-fpectl --without-readline \
   --with-system-expat --with-system-libmpdec \
@@ -337,7 +342,7 @@ fi
   CFLAGS="-g $CFLAGS" \
   LDFLAGS="-arch $arch -g -Xlinker $LDFLAGS ${LTO_OPTS}" \
   LIBS="-lffi -lbz2 -lsqlite3 -llzma -lmp_embed -lssl -lcrypto -lz " \
-  PROFILE_TASK='-m test --pgo -x test_json ' \
+  "PROFILE_TASK=${profile_task}" \
   MODULE_BUILDTYPE=static \
   ax_cv_c_float_words_bigendian=no \
   "___ORIG_DEPS_PREFIX=${PREFIX}___"

@@ -312,6 +312,11 @@ export "CXXFLAGS=-I${PREFIX}/include -fPIC -flto -fuse-linker-plugin -fno-fat-lt
 export "CPPFLAGS=-I${PREFIX}/include"
 
 # The UCS4 has best compatibility with wheels on PyPI it seems.
+# The profile-guided build trains on this. MONOLITHPY_PROFILE_TASK replaces
+# it, with a script that also trains on an application the interpreter will
+# run, for one.
+profile_task="${MONOLITHPY_PROFILE_TASK:--m test --pgo -x test_json }"
+
 ./configure "--prefix=$target" --disable-shared --enable-ipv6 --enable-unicode=ucs4 \
   --enable-optimizations --with-lto --with-computed-gotos --with-fpectl --without-readline \
   --with-system-expat --with-system-libmpdec \
@@ -320,7 +325,7 @@ export "CPPFLAGS=-I${PREFIX}/include"
   CFLAGS="-g $CFLAGS" \
   LDFLAGS="-g -Xlinker -export-dynamic -rdynamic -Bsymbolic-functions -Wl,-z,relro -Wl,-allow-multiple-definition $LDFLAGS" \
   LIBS="-l:libffi.a -l:libbz2.a -l:libuuid.a -l:libsqlite3.a -l:liblzma.a -l:librt.a -l:libmp_embed.a" \
-  PROFILE_TASK='-m test --pgo -x test_json ' \
+  "PROFILE_TASK=${profile_task}" \
   MODULE_BUILDTYPE=static \
   ax_cv_c_float_words_bigendian=no \
   ac_cv_lib_sqlite3_sqlite3_bind_double=yes ac_cv_lib_sqlite3_sqlite3_column_decltype=yes ac_cv_lib_sqlite3_sqlite3_column_double=yes \
