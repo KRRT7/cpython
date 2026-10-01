@@ -1,7 +1,9 @@
 #define MONOLITHPY_EMBED_BUILD
 #define _FILE_OFFSET_BITS 64
 #include "mp_embed.h"
+#ifndef PATH_MAX
 #define PATH_MAX 4096
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #include <shlwapi.h>
