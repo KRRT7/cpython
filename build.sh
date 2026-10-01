@@ -138,7 +138,10 @@ download_file() {
     download_file https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz zstd.tar.gz
     tar -xf zstd.tar.gz
   fi
-  make -C zstd-1.5.7/lib -j$(nproc --all) libzstd.a CC="$CC"
+  # nproc, not nproc --all: --all counts every CPU the kernel is configured
+  # for, 128 on a 16-CPU VM, where that many jobs at once, LTO ones above
+  # all, only cost memory.
+  make -C zstd-1.5.7/lib -j$(nproc) libzstd.a CC="$CC"
   cp zstd-1.5.7/lib/libzstd.a ${PREFIX}/lib/
   # _zstd CPython module uses <zstd.h>, <zdict.h>, <zstd_errors.h>; copy all.
   cp zstd-1.5.7/lib/zstd.h zstd-1.5.7/lib/zstd_errors.h zstd-1.5.7/lib/zdict.h ${PREFIX}/include/
@@ -168,7 +171,7 @@ download_file https://mirrors.kernel.org/gnu/ncurses/ncurses-6.5.tar.gz ncurses.
 tar -xf ncurses.tar.gz
 cd ncurses-6.5
 ./configure --prefix=${PREFIX} --disable-shared --enable-termcap --enable-widec --enable-getcap --without-cxx-binding
-make libs -j$(nproc --all)
+make libs -j$(nproc)
 make install.libs install.includes
 for header in ${PREFIX}/include/ncursesw/*; do
     ln -s ncursesw/$(basename $header) ${PREFIX}/include/;
@@ -181,7 +184,7 @@ download_file https://github.com/troglobit/editline/releases/download/2.1.0/edit
 tar -xf editline.tar.gz
 cd editline-2.1.0
 ./configure --prefix=${PREFIX} --disable-shared
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cd ..
 fi
@@ -195,7 +198,7 @@ export "CPPFLAGS_bak=$CPPFLAGS"
 export "CFLAGS=$CFLAGS -DSQLITE_ENABLE_COLUMN_METADATA"
 export "CPPFLAGS=$CPPFLAGS -DSQLITE_ENABLE_COLUMN_METADATA"
 ./configure --prefix=${PREFIX} --disable-shared
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 export "CFLAGS=$CFLAGS_bak"
 export "CPPFLAGS=$CPPFLAGS_bak"
@@ -209,7 +212,7 @@ cd openssl-3.5.7
 export "CPPINCLUDES=$PYTHON_BASE/Include"
 ./Configure --prefix=${PREFIX} --libdir=lib linux-x86_64 enable-ec_nistp_64_gcc_128 no-shared no-tests --openssldir=/vfs/ssl
 find . \( -iname '*.h.in' -o -iname '*.h' -o -iname '*.c' -o -iname '*.cc' -o -iname '*.cpp' -o -iname '*.cxx' \) | xargs sed -i '1s/^/#include "mp_embed.h"\n\'$'\n/g'
-make install_dev -j$(nproc --all)
+make install_dev -j$(nproc)
 unset CPPINCLUDES
 cd ..
 fi
@@ -218,7 +221,7 @@ if [ ! -d bzip2-bzip2-1.0.8 ]; then
 download_file https://gitlab.com/bzip2/bzip2/-/archive/bzip2-1.0.8/bzip2-bzip2-1.0.8.tar.gz bzip2.tar.gz
 tar -xf bzip2.tar.gz
 cd bzip2-bzip2-1.0.8
-make install "PREFIX=$PREFIX" -j$(nproc --all)
+make install "PREFIX=$PREFIX" -j$(nproc)
 cd ..
 fi
 
@@ -227,7 +230,7 @@ download_file https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.39/u
 tar -xf util-linux.tar.gz
 cd util-linux-2.39
 ./configure --prefix=${PREFIX} --disable-shared --disable-all-programs --enable-libuuid
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cp ./libuuid/src/uuid.h ${PREFIX}/include/
 cd ..
@@ -238,7 +241,7 @@ download_file https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-
 tar -xf xz.tar.gz
 cd xz-5.8.1
 ./configure --prefix=${PREFIX} --disable-shared
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cd ..
 fi
@@ -248,7 +251,7 @@ download_file https://github.com/libffi/libffi/releases/download/v3.7.1/libffi-3
 tar -xf libffi.tar.gz
 cd libffi-3.7.1
 ./configure --prefix=${PREFIX} --disable-shared
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cd ..
 fi
@@ -259,7 +262,7 @@ tar -xf zlib.tar.gz
 mv zlib-* zlib-latest
 cd zlib-latest
 ./configure --prefix=${PREFIX} --static
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cd ..
 fi
@@ -269,7 +272,7 @@ download_file https://github.com/libexpat/libexpat/releases/download/R_2_8_2/exp
 tar -xf expat.tar.gz
 cd expat-2.8.2
 ./configure --prefix=${PREFIX} --disable-shared
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cd ..
 fi
@@ -279,7 +282,7 @@ download_file https://www.bytereef.org/software/mpdecimal/releases/mpdecimal-4.0
 tar -xf mpdecimal.tar.gz
 cd mpdecimal-4.0.1
 ./configure --prefix=${PREFIX} --disable-shared
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cd ..
 fi
@@ -289,7 +292,7 @@ download_file https://github.com/BLAKE2/libb2/releases/download/v0.98.1/libb2-0.
 tar -xf libb2.tar.gz
 cd libb2-0.98.1
 ./configure --prefix=${PREFIX} --disable-shared
-make -j$(nproc --all)
+make -j$(nproc)
 make install
 cd ..
 fi
@@ -334,7 +337,7 @@ profile_task="${MONOLITHPY_PROFILE_TASK:--m test --pgo -x test_json }"
   ac_cv_lib_sqlite3_sqlite3_value_double=yes ac_cv_lib_sqlite3_sqlite3_load_extension=yes ac_cv_lib_sqlite3_sqlite3_serialize=yes \
   ___ORIG_DEPS_PREFIX=${PREFIX}___
 
-make -j $(nproc --all) \
+make -j $(nproc) \
         EXTRA_CFLAGS="-flto -fuse-linker-plugin -fno-fat-lto-objects" \
         profile-opt
 
