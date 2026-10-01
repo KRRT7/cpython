@@ -64,6 +64,14 @@ fi
 export CC
 export CXX
 
+# CPython's configure takes the first llvm-profdata on PATH, which can be a
+# newer LLVM's than the compiler's -- Homebrew's, say -- and Xcode's clang then
+# rejects the merged profile ("unsupported instrumentation profile format
+# version"). With Xcode's clang, use the llvm-profdata that comes with it.
+if [ "$CC" = "clang" ] && [ -z "$LLVM_PROFDATA" ]; then
+  export LLVM_PROFDATA="$(xcrun -f llvm-profdata)"
+fi
+
 # Have this as a standard path. We are not yet relocatable, but that will come hopefully.
 target=~/Library/MonolithPy${short_version}-$arch
 
