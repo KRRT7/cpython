@@ -89,7 +89,9 @@ mkdir -p dep-build
 # zstandard gives mkembeddata a zstd backend when python3 predates 3.14
 # (compression.zstd). Install it for the build user; put the user script dir
 # first, and ${PREFIX}/bin (where the pkg-config we build below lands) on PATH.
-python3 -m pip install --user --quiet zstandard || python3 -m pip install --user --quiet --break-system-packages zstandard
+if ! python3 -c "import compression.zstd" 2>/dev/null; then
+  python3 -m pip install --user --quiet zstandard || python3 -m pip install --user --quiet --break-system-packages zstandard
+fi
 export PATH="$(python3 -m site --user-base)/bin:${PREFIX}/bin:$PATH"
 
 download_file() {
