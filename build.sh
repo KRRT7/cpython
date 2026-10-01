@@ -156,7 +156,16 @@ python3 Lib/mkembeddata.py Embedded Embedded/embed_data
 # -lmp_embed even though we don't need interception there). Without
 # -fPIC, GCC emits PC32 relocations against glibc symbols like stderr
 # that can't be used in shared objects, and the dep builds fail.
-$CC -c -g -DMP_EMBED_USE_WRAP -fPIC -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
+# Debug information goes into every object, libpython and the interpreter,
+# and Nuitka strips the programs built on them anyway. MONOLITHPY_DEBUG_INFO=1
+# keeps it, for debugging the interpreter itself. CPython adds -g of its own
+# through OPT, so OPT is given to configure too.
+debug_flag=""
+if [ "${MONOLITHPY_DEBUG_INFO:-}" = "1" ]; then
+  debug_flag="-g"
+fi
+
+$CC -c $debug_flag -DMP_EMBED_USE_WRAP -fPIC -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
 $CC -c -fPIC -o Embedded/mp_embed_data.o Embedded/mp_embed_data.c
 ar rcs ${PREFIX}/lib/libmp_embed.a Embedded/mp_embed.o Embedded/mp_embed_data.o
 
@@ -325,8 +334,9 @@ profile_task="${MONOLITHPY_PROFILE_TASK:--m test --pgo -x test_json }"
   --with-system-expat --with-system-libmpdec \
   CC="$CC" \
   CXX="$CXX" \
-  CFLAGS="-g $CFLAGS" \
-  LDFLAGS="-g -Xlinker -export-dynamic -rdynamic -Bsymbolic-functions -Wl,-z,relro -Wl,-allow-multiple-definition $LDFLAGS" \
+  CFLAGS="$debug_flag $CFLAGS" \
+  "OPT=-DNDEBUG $debug_flag -O3 -Wall" \
+  LDFLAGS="$debug_flag -Xlinker -export-dynamic -rdynamic -Bsymbolic-functions -Wl,-z,relro -Wl,-allow-multiple-definition $LDFLAGS" \
   LIBS="-l:libffi.a -l:libbz2.a -l:libuuid.a -l:libsqlite3.a -l:liblzma.a -l:librt.a -l:libmp_embed.a" \
   "PROFILE_TASK=${profile_task}" \
   MODULE_BUILDTYPE=static \
@@ -372,7 +382,7 @@ $ELEVATE cp -v Modules/_hacl/libHacl_HMAC.a "$target/lib/"
 $ELEVATE mkdir -p "$target/Embedded"
 # The object file usually gets deleted during the build, so make sure to recompile here just in case.
 rm -f Embedded/mp_embed.o
-$CC -c -g -DMP_EMBED_USE_WRAP -fPIC -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
+$CC -c $debug_flag -DMP_EMBED_USE_WRAP -fPIC -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
 $ELEVATE cp -r "Embedded/mp_embed.o" "$target/Embedded/"
 $ELEVATE cp -r "Embedded/embed_data" "$target/Embedded/"
 

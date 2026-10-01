@@ -876,7 +876,7 @@ static inline void Py_InitStaticModules(void) {
             output_dir=build_dir,
             libraries=ordered_link_libs,
             library_dirs=library_dirs,
-            extra_preargs=["-g", "-Xlinker"],
+            extra_preargs=["-Xlinker"],
             extra_midargs=final_extra_link_args,
         )
 

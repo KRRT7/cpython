@@ -167,7 +167,16 @@ mkdir -p Embedded/embed_data/vfs/ssl
 curl -fL --retry 3 --retry-delay 2 --retry-connrefused --connect-timeout 20 --max-time 120 https://mkcert.org/generate/ | python3 -c "import sys; [sys.stdout.buffer.write(line.decode('utf-8').encode('ascii', errors='backslashreplace')) for line in sys.stdin.buffer]" > Embedded/embed_data/vfs/ssl/cert.pem
 python3 Lib/mkembeddata.py Embedded Embedded/embed_data
 # No -DMP_EMBED_USE_WRAP on macOS - see the LDFLAGS comment above.
-$CC -c -g -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
+# Debug information goes into every object, libpython and the interpreter,
+# and Nuitka strips the programs built on them anyway. MONOLITHPY_DEBUG_INFO=1
+# keeps it, for debugging the interpreter itself. CPython adds -g of its own
+# through OPT, so OPT is given to configure too.
+debug_flag=""
+if [ "${MONOLITHPY_DEBUG_INFO:-}" = "1" ]; then
+  debug_flag="-g"
+fi
+
+$CC -c $debug_flag -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
 $CC -c -o Embedded/mp_embed_data.o Embedded/mp_embed_data.c
 ar rcs ${PREFIX}/lib/libmp_embed.a Embedded/mp_embed.o Embedded/mp_embed_data.o
 
@@ -329,6 +338,13 @@ long_version=$(git branch --show-current 2>/dev/null || git symbolic-ref --short
 long_version=$(echo $long_version | sed -e 's#-.*##')
 short_version=$(echo $long_version | sed -e 's#\.##')
 
+# Modules/Setup is the Linux configuration, which git tracks. The build needs
+# the macOS one in its place; the Linux one goes back however the script ends,
+# so a build leaves nothing to commit by mistake. make install keeps its own
+# copy of the macOS one under lib/python*/config-*.
+setup_backup="$(mktemp)"
+cp Modules/Setup "$setup_backup"
+trap 'cp "$setup_backup" Modules/Setup && rm -f "$setup_backup"' EXIT
 cp Modules/Setup.macos Modules/Setup
 
 export "LDFLAGS=-L${PREFIX}/lib"
@@ -351,8 +367,9 @@ profile_task="${MONOLITHPY_PROFILE_TASK:--m test --pgo -x test_json }"
   --with-system-expat --with-system-libmpdec \
   CC="$CC" \
   CXX="$CXX" \
-  CFLAGS="-g $CFLAGS" \
-  LDFLAGS="-arch $arch -g -Wl,-no_warn_duplicate_libraries -Xlinker $LDFLAGS ${LTO_OPTS}" \
+  CFLAGS="$debug_flag $CFLAGS" \
+  "OPT=-DNDEBUG $debug_flag -O3 -Wall" \
+  LDFLAGS="-arch $arch $debug_flag -Wl,-no_warn_duplicate_libraries -Xlinker $LDFLAGS ${LTO_OPTS}" \
   LIBS="-lffi -lbz2 -lsqlite3 -llzma -lmp_embed -lssl -lcrypto -lz " \
   "PROFILE_TASK=${profile_task}" \
   MODULE_BUILDTYPE=static \
@@ -392,7 +409,7 @@ $ELEVATE cp -v Modules/_hacl/libHacl_HMAC.a "$target/lib/"
 $ELEVATE mkdir -p "$target/Embedded"
 # The object file usually gets deleted during the build, so make sure to recompile here just in case.
 rm -f Embedded/mp_embed.o
-$CC -c -g -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
+$CC -c $debug_flag -o Embedded/mp_embed.o Embedded/mp_embed.c -IInclude -I${PREFIX}/include
 $ELEVATE cp -r "Embedded/mp_embed.o" "$target/Embedded/"
 $ELEVATE cp -r "Embedded/embed_data" "$target/Embedded/"
 

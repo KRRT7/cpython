@@ -176,8 +176,7 @@ _sha2 sha2module.c -I$(srcdir)/Modules/_hacl/include Modules/_hacl/libHacl_Hash_
 _sha3 sha3module.c -I$(srcdir)/Modules/_hacl/include _hacl/Hacl_Hash_SHA3.c -D_BSD_SOURCE -D_DEFAULT_SOURCE
 _hmac hmacmodule.c -I$(srcdir)/Modules/_hacl/include Modules/_hacl/libHacl_HMAC.a
 
-# New in 3.14: remote-process debugging support (reads another process's
-# memory to reconstruct stack/asyncio state).
+# New in 3.14: remote-process debugging support.
 _remote_debugging _remote_debugging_module.c
 
 # text encodings and unicode
@@ -193,7 +192,7 @@ unicodedata unicodedata.c
 # Modules with some UNIX dependencies
 
 _posixsubprocess _posixsubprocess.c
-_posixshmem -I$(srcdir)/Modules/_multiprocessing _multiprocessing/posixshmem.c
+_posixshmem -I$(srcdir)/Modules/_multiprocessing _multiprocessing/posixshmem.c -lrt
 fcntl fcntlmodule.c
 grp grpmodule.c
 resource resource.c
@@ -202,45 +201,37 @@ termios termios.c
 
 # Modules that require external libraries.
 
-_bz2 _bz2module.c -lbz2
-_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -ldl -lffi -DHAVE_FFI_PREP_CIF_VAR -DHAVE_FFI_PREP_CLOSURE_LOC -DHAVE_FFI_CLOSURE_ALLOC
+_bz2 _bz2module.c -l:libbz2.a
+_ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -ldl -l:libffi.a -DHAVE_FFI_PREP_CIF_VAR -DHAVE_FFI_PREP_CLOSURE_LOC -DHAVE_FFI_CLOSURE_ALLOC
 # The _dbm module supports NDBM, GDBM with compat module, and Berkeley DB.
 #_dbm _dbmmodule.c -l:libgdbm_compat.a -DUSE_GDBM_COMPAT
-#_gdbm _gdbmmodule.c -lgdbm
-_lzma _lzmamodule.c -llzma
-_sqlite3 -I$(srcdir)/Modules/_sqlite _sqlite/blob.c _sqlite/connection.c _sqlite/cursor.c _sqlite/microprotocols.c _sqlite/module.c _sqlite/prepare_protocol.c _sqlite/row.c _sqlite/statement.c _sqlite/util.c -lsqlite3 -DMODULE_NAME='"sqlite3"' -DSQLITE_ENABLE_COLUMN_METADATA
-# macOS SDK ships <uuid/uuid.h> and libSystem provides uuid_generate*, so we
-# don't need libuuid (util-linux) here. The -DHAVE_UUID_UUID_H picks the
-# right header branch in _uuidmodule.c without having to regen pyconfig.h.
-_uuid _uuidmodule.c -DHAVE_UUID_UUID_H
-zlib  zlibmodule.c -lz
-# zstd - libzstd.a is built by build.mac.sh and is also what mp_embed
-# decompresses its embedded blob with. Wiring _zstd here also guarantees
-# libzstd is on the final link line so mp_embed's ZSTD_* references resolve.
-_zstd _zstd/_zstdmodule.c _zstd/compressor.c _zstd/decompressor.c _zstd/zstddict.c -I$(srcdir)/Modules/_zstd -lzstd
+#_gdbm _gdbmmodule.c -l:libgdbm.a
+_lzma _lzmamodule.c -l:liblzma.a
+_sqlite3 -I$(srcdir)/Modules/_sqlite _sqlite/blob.c _sqlite/connection.c _sqlite/cursor.c _sqlite/microprotocols.c _sqlite/module.c _sqlite/prepare_protocol.c _sqlite/row.c _sqlite/statement.c _sqlite/util.c -l:libsqlite3.a -DMODULE_NAME='"sqlite3"' -DSQLITE_ENABLE_COLUMN_METADATA
+_uuid _uuidmodule.c -l:libuuid.a
+_zstd _zstd/_zstdmodule.c _zstd/compressor.c _zstd/decompressor.c _zstd/zstddict.c -I$(srcdir)/Modules/_zstd -l:libzstd.a
+zlib  zlibmodule.c -l:libz.a
 
-# build.mac.sh passes --without-readline to configure, so the readline
-# module is intentionally not built (matches Linux/Setup).
-#readline readline.c -leditline -DWITH_EDITLINE
+# The readline module also supports libeditline (-leditline).
+# Some systems may require -ltermcap or -ltermlib.
+#readline readline.c -l:libeditline.a -DWITH_EDITLINE
 
 # OpenSSL bindings
 #_ssl _ssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS)
 #_hashlib _hashopenssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -lcrypto
 
 # To statically link OpenSSL:
-_ssl _ssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -lssl -lcrypto
-_hashlib _hashopenssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -lcrypto
+_ssl _ssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -l:libssl.a -l:libcrypto.a
+_hashlib _hashopenssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -l:libcrypto.a
 
-# _tkinter is not built: Tcl/Tk are left out (see *disabled*).
+# _tkinter is not built: Tcl/Tk and X11 are left out (see *disabled*).
 
-# ncursesw wide-char support. _XOPEN_SOURCE_EXTENDED=1 is what exposes
-# wget_wch/mvwget_wch/wins_wstr/etc. that _cursesmodule.c uses
-# (upstream adds it via CURSES_CFLAGS in configure.ac).
-_curses _cursesmodule.c -D_XOPEN_SOURCE_EXTENDED=1 -lncursesw
-_curses_panel _curses_panel.c -D_XOPEN_SOURCE_EXTENDED=1 -lpanelw -lncursesw
+# Some system have -lcurses
+_curses -l:libncursesw.a _cursesmodule.c
+_curses_panel -l:libpanelw.a -l:libncursesw.a _curses_panel.c
 
 # macOS specific module, needs SystemConfiguration and CoreFoundation framework
-_scproxy _scproxy.c
+# _scproxy _scproxy.c
 
 # Examples
 
@@ -294,6 +285,7 @@ _testclinic
 _testclinic_limited
 _testinternalcapi
 _testlimitedcapi
+_uuid
 xxlimited_35
 xxsubtype
 _gdbm
