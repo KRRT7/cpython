@@ -29,7 +29,11 @@ set -x
 # happens to also delete all the static libraries that we built.
 export "PREFIX=$(pwd)/../MonolithPy-Deps"
 export "PYTHON_BASE=$(pwd)"
-export "CFLAGS=-I${PREFIX}/include -I${PYTHON_BASE}/Include -fPIC -flto -fuse-linker-plugin -fno-fat-lto-objects"
+# GCC 14 turned these warnings into errors. The embed layer hands EFILE *
+# where stdio expects FILE * (OpenSSL's BIO_new_fp(stderr, ...)), and older
+# dependency code relies on the rest, so keep them warnings, as GCC 13 has.
+GCC14_COMPAT="-Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -Wno-error=int-conversion"
+export "CFLAGS=-I${PREFIX}/include -I${PYTHON_BASE}/Include -fPIC -flto -fuse-linker-plugin -fno-fat-lto-objects ${GCC14_COMPAT}"
 export "CXXFLAGS=-I${PREFIX}/include -I${PYTHON_BASE}/Include -fPIC -flto -fuse-linker-plugin -fno-fat-lto-objects"
 export "CPPFLAGS=-I${PREFIX}/include -I${PYTHON_BASE}/Include"
 # --wrap rewrites references to fopen/fclose/etc into __wrap_NAME, but
@@ -303,7 +307,7 @@ then
   target="$1"
 fi
 
-export "CFLAGS=-I${PREFIX}/include -fPIC -flto -fuse-linker-plugin -fno-fat-lto-objects"
+export "CFLAGS=-I${PREFIX}/include -fPIC -flto -fuse-linker-plugin -fno-fat-lto-objects ${GCC14_COMPAT}"
 export "CXXFLAGS=-I${PREFIX}/include -fPIC -flto -fuse-linker-plugin -fno-fat-lto-objects"
 export "CPPFLAGS=-I${PREFIX}/include"
 
