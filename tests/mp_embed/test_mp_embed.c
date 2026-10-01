@@ -26,6 +26,7 @@
 #else
 #  include <sys/types.h>
 #  include <sys/stat.h>
+#  include <fcntl.h>
 #  include <unistd.h>
 #  include <dirent.h>
 #  include <pthread.h>
@@ -134,6 +135,47 @@ static void test_seek_tell(void) {
 
     fclose(f);
 }
+
+#ifndef _WIN32
+/* pread() reads at the offset it is given, counted from the start of the
+ * file, and leaves the file position alone: for a virtual file, and for a
+ * real one, which mp_pread hands to the real pread(). */
+static void test_pread(void) {
+    fprintf(stderr, "[pread]\n");
+    unsigned char buf[4];
+
+    int fd = open(VPATH_PREFIX VPATH_SEP "binary.bin", O_RDONLY);
+    CHECK(fd >= 0, "open binary.bin: %d", fd);
+    if (fd >= 0) {
+        CHECK(read(fd, buf, 10) == 10, "read 10 from binary.bin");
+        CHECK(pread(fd, buf, 4, 100) == 4, "virtual pread at 100");
+        CHECK(buf[0] == 100 && buf[3] == 103,
+              "virtual pread at 100 = %d..%d (want 100..103)", buf[0], buf[3]);
+        CHECK(pread(fd, buf, 4, 254) == 2, "virtual pread past the end");
+        CHECK(read(fd, buf, 1) == 1 && buf[0] == 10,
+              "virtual position after pread = %d (want 10)", buf[0]);
+        close(fd);
+    }
+
+    char path[] = "/tmp/mp_embed_pread_XXXXXX";
+    fd = mkstemp(path);
+    CHECK(fd >= 0, "mkstemp: %d", fd);
+    if (fd < 0) return;
+    unlink(path);
+    unsigned char data[256];
+    for (int i = 0; i < 256; ++i) data[i] = (unsigned char)i;
+    CHECK(write(fd, data, sizeof data) == (ssize_t)sizeof data, "write real file");
+    CHECK(lseek(fd, 10, SEEK_SET) == 10, "lseek real file to 10");
+    CHECK(pread(fd, buf, 4, 0) == 4, "real pread at 0");
+    CHECK(buf[0] == 0 && buf[3] == 3,
+          "real pread at 0 = %d..%d (want 0..3)", buf[0], buf[3]);
+    CHECK(read(fd, buf, 1) == 1 && buf[0] == 10,
+          "real position after pread = %d (want 10)", buf[0]);
+    close(fd);
+}
+#else
+static void test_pread(void) { (void)0; }
+#endif
 
 static void test_repeated_open(void) {
     fprintf(stderr, "[repeated_open]\n");
@@ -534,6 +576,7 @@ int main(void) {
     test_one_byte_file();
     test_binary_all_bytes();
     test_seek_tell();
+    test_pread();
     test_repeated_open();
     test_concurrent_handles();
     test_out_of_bounds();

@@ -1460,19 +1460,22 @@ MP_DECL(ssize_t) mp_pread(int fd, void *buf, size_t count, off_t offset) {
     }
   }
   if (e == NULL) {
-    return read(fd, buf, count);
+    // A real file: pread() reads at the offset and leaves the file position
+    // alone, which read() would neither do.
+    return pread(fd, buf, count, offset);
   }
 
   if (offset >= e->size) {
     return 0; // Offset is beyond the end of the file
   }
 
-  size_t available = e->end - e->pos;
   if (offset + count > e->size) {
     count = e->size - offset; // Adjust count to not exceed the file size
   }
 
-  memcpy(buf, e->pos + offset, count);
+  // The offset counts from the start of the file, not the current position,
+  // and the position does not move.
+  memcpy(buf, (e->end - e->size) + offset, count);
   return count;
 }
 

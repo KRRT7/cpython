@@ -183,6 +183,23 @@ def test_subprocess_python():
     assert r.stdout.strip() == "4", r
 
 
+def test_os_pread():
+    # pread reads at the offset it is given and leaves the file position
+    # alone. zipfile readers and wheel installers rely on it.
+    import os
+    import tempfile
+    if not hasattr(os, "pread"):
+        return
+    with tempfile.TemporaryFile() as f:
+        f.write(bytes(range(256)))
+        f.flush()
+        fd = f.fileno()
+        os.lseek(fd, 10, os.SEEK_SET)
+        assert os.pread(fd, 4, 0) == bytes(range(4))
+        assert os.pread(fd, 4, 100) == bytes(range(100, 104))
+        assert os.read(fd, 1) == bytes([10])
+
+
 def main():
     tests = [
         ("version", test_version),
@@ -200,6 +217,7 @@ def main():
         ("hashlib_sha256", test_hashlib_sha256),
         ("remote_debugging_module_3_14", test_remote_debugging_module_3_14),
         ("subprocess_python", test_subprocess_python),
+        ("os_pread", test_os_pread),
     ]
     for name, fn in tests:
         expect(name, fn)
