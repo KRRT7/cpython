@@ -337,6 +337,10 @@ if [[ "$LTO" == "1" ]]; then
     LTO_BUILD_OPT=--with-lto
 fi
 
+# Static libraries are named twice on the link, once in LIBS and again by
+# each module in Modules/Setup.macos that uses them; Apple's linker keeps
+# one of each and warns. -no_warn_duplicate_libraries drops the warning,
+# and reaches rebuildpython's relinks through the recorded LDFLAGS.
 # The profile-guided build trains on this. MONOLITHPY_PROFILE_TASK replaces
 # it, with a script that also trains on an application the interpreter will
 # run, for one.
@@ -348,7 +352,7 @@ profile_task="${MONOLITHPY_PROFILE_TASK:--m test --pgo -x test_json }"
   CC="$CC" \
   CXX="$CXX" \
   CFLAGS="-g $CFLAGS" \
-  LDFLAGS="-arch $arch -g -Xlinker $LDFLAGS ${LTO_OPTS}" \
+  LDFLAGS="-arch $arch -g -Wl,-no_warn_duplicate_libraries -Xlinker $LDFLAGS ${LTO_OPTS}" \
   LIBS="-lffi -lbz2 -lsqlite3 -llzma -lmp_embed -lssl -lcrypto -lz " \
   "PROFILE_TASK=${profile_task}" \
   MODULE_BUILDTYPE=static \
